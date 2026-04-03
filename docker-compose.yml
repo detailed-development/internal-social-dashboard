@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ncm
+      POSTGRES_PASSWORD: ncm_local
+      POSTGRES_DB: ncm_social
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # 5433 on host to avoid conflicts
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file: .env
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    command: npm run dev:api
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client/src:/app/src
+    command: npm run dev -- --host
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file: .env
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    command: node src/workers/sync-all.js
+
+volumes:
+  pgdata:

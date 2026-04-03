@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id             String          @id @default(uuid())
+  name           String
+  slug           String          @unique
+  avatarColor    String?         @map("avatar_color")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  socialAccounts SocialAccount[]
+
+  @@map("clients")
+}
+
+enum Platform {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  TWITTER
+}
+
+enum TokenStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  PENDING
+}
+
+enum MediaType {
+  POST
+  REEL
+  STORY
+  VIDEO
+  TWEET
+  SHORT
+}
+
+model SocialAccount {
+  id              String      @id @default(uuid())
+  clientId        String      @map("client_id")
+  platform        Platform
+  platformUserId  String      @map("platform_user_id")
+  handle          String
+  displayName     String?     @map("display_name")
+  accessToken     String?     @map("access_token")
+  refreshToken    String?     @map("refresh_token")
+  tokenStatus     TokenStatus @default(PENDING) @map("token_status")
+  tokenExpiresAt  DateTime?   @map("token_expires_at")
+  lastSyncedAt    DateTime?   @map("last_synced_at")
+  followerCount   Int?        @map("follower_count")
+  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  posts           Post[]
+
+  @@unique([platform, platformUserId])
+  @@index([clientId])
+  @@map("social_accounts")
+}
+
+model Post {
+  id              String        @id @default(uuid())
+  socialAccountId String        @map("social_account_id")
+  platformPostId  String        @map("platform_post_id")
+  mediaType       MediaType     @map("media_type")
+  caption         String?
+  permalink       String?
+  mediaUrl        String?       @map("media_url")
+  thumbnailUrl    String?       @map("thumbnail_url")
+  publishedAt     DateTime      @map("published_at")
+  fetchedAt       DateTime      @default(now()) @map("fetched_at")
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  metrics         PostMetric[]
+  comments        Comment[]
+  transcription   Transcription?
+
+  @@unique([socialAccountId, platformPostId])
+  @@index([socialAccountId, publishedAt(sort: Desc)])
+  @@map("posts")
+}
+
+model PostMetric {
+  id             String   @id @default(uuid())
+  postId         String   @map("post_id")
+  impressions    Int      @default(0)
+  reach          Int      @default(0)
+  likes          Int      @default(0)
+  commentsCount  Int      @default(0) @map("comments_count")
+  shares         Int      @default(0)
+  saves          Int      @default(0)
+  videoPlays     Int      @default(0) @map("video_plays")
+  engagementRate Float?   @map("engagement_rate")
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+  post           Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, recordedAt(sort: Desc)])
+  @@map("post_metrics")
+}
+
+model Comment {
+  id                String    @id @default(uuid())
+  postId            String    @map("post_id")
+  platformCommentId String    @map("platform_comment_id")
+  authorName        String?   @map("author_name")
+  body              String
+  sentimentScore    Float?    @map("sentiment_score")
+  postedAt          DateTime  @map("posted_at")
+  post              Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  buzzwords         Buzzword[]
+
+  @@unique([postId, platformCommentId])
+  @@index([postId, postedAt(sort: Desc)])
+  @@map("comments")
+}
+
+model Transcription {
+  id              String    @id @default(uuid())
+  postId          String    @unique @map("post_id")
+  transcriptText  String    @map("transcript_text")
+  language        String    @default("en")
+  confidence      Float?
+  durationSeconds Int?      @map("duration_seconds")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  buzzwords       Buzzword[]
+
+  @@map("transcriptions")
+}
+
+model Buzzword {
+  id              String         @id @default(uuid())
+  commentId       String?        @map("comment_id")
+  transcriptionId String?        @map("transcription_id")
+  word            String
+  frequency       Int            @default(1)
+  relevanceScore  Float?         @map("relevance_score")
+  extractedAt     DateTime       @default(now()) @map("extracted_at")
+  comment         Comment?       @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  transcription   Transcription? @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([word])
+  @@index([commentId])
+  @@index([transcriptionId])
+  @@map("buzzwords")
+}
