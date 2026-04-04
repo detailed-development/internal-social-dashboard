@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
@@ -26,7 +24,9 @@ services:
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma
-    command: npm run dev:api
+      - ./scripts:/app/scripts
+      - ./.env:/app/.env
+    command: sh -c "npx prisma generate && npm run dev:api"
 
   client:
     build:
@@ -52,7 +52,8 @@ services:
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma
-    command: node src/workers/sync-all.js
+      - ./google-service-account.json:/app/google-service-account.json
+    command: sh -c "npx prisma generate && node src/workers/sync-all.js"
 
 volumes:
   pgdata:

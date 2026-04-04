@@ -7,13 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model ClientGroup {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  avatarColor String?  @map("avatar_color")
+  sortOrder   Int      @default(0) @map("sort_order")
+  clients     Client[]
+
+  @@map("client_groups")
+}
+
 model Client {
   id             String          @id @default(uuid())
   name           String
   slug           String          @unique
   avatarColor    String?         @map("avatar_color")
+  gaPropertyId   String?         @map("ga_property_id")
+  gtmContainerId String?         @map("gtm_container_id")
+  websiteUrl     String?         @map("website_url")
+  groupId        String?         @map("group_id")
   createdAt      DateTime        @default(now()) @map("created_at")
+  group          ClientGroup?    @relation(fields: [groupId], references: [id])
   socialAccounts SocialAccount[]
+  webAnalytics   WebAnalytic[]
 
   @@map("clients")
 }
@@ -130,6 +147,25 @@ model Transcription {
   buzzwords       Buzzword[]
 
   @@map("transcriptions")
+}
+
+model WebAnalytic {
+  id                   String   @id @default(uuid())
+  clientId             String   @map("client_id")
+  date                 DateTime @map("date") @db.Date
+  sessions             Int      @default(0)
+  users                Int      @default(0)
+  newUsers             Int      @default(0) @map("new_users")
+  pageviews            Int      @default(0)
+  bounceRate           Float?   @map("bounce_rate")
+  avgSessionDuration   Float?   @map("avg_session_duration")
+  source               String?
+  medium               String?
+  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, source, medium])
+  @@index([clientId, date(sort: Desc)])
+  @@map("web_analytics")
 }
 
 model Buzzword {

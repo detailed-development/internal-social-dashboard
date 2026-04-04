@@ -4,3 +4,4 @@ dist/
 .prisma/
 *.log
 .DS_Store
+google-service-account.json

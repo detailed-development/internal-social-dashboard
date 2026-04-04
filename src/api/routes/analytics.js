@@ -38,4 +38,54 @@ router.get('/client/:slug/buzzwords', async (req, res) => {
   res.json(buzzwords);
 });
 
+router.get('/client/:slug/web', async (req, res) => {
+  const prisma = req.app.get('prisma');
+  const client = await prisma.client.findUnique({ where: { slug: req.params.slug } });
+  if (!client) return res.status(404).json({ error: 'Client not found' });
+
+  // Daily totals (last 30 days)
+  const daily = await prisma.webAnalytic.findMany({
+    where: { clientId: client.id, source: 'all', medium: 'all' },
+    orderBy: { date: 'asc' },
+    take: 30,
+  });
+
+  // Traffic source breakdown
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const sources = await prisma.webAnalytic.findMany({
+    where: {
+      clientId: client.id,
+      date: today,
+      NOT: { source: 'all' },
+    },
+    orderBy: { sessions: 'desc' },
+    take: 10,
+  });
+
+  // 30-day totals
+  const totals = daily.reduce((acc, row) => ({
+    sessions:  acc.sessions  + row.sessions,
+    users:     acc.users     + row.users,
+    newUsers:  acc.newUsers  + row.newUsers,
+    pageviews: acc.pageviews + row.pageviews,
+  }), { sessions: 0, users: 0, newUsers: 0, pageviews: 0 });
+
+  const avgBounceRate = daily.length
+    ? daily.reduce((s, r) => s + (r.bounceRate || 0), 0) / daily.length
+    : null;
+
+  const avgSessionDuration = daily.length
+    ? daily.reduce((s, r) => s + (r.avgSessionDuration || 0), 0) / daily.length
+    : null;
+
+  res.json({
+    gaPropertyId: client.gaPropertyId,
+    websiteUrl:   client.websiteUrl,
+    totals:       { ...totals, avgBounceRate, avgSessionDuration },
+    daily,
+    sources,
+  });
+});
+
 export default router;
