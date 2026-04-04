@@ -23,7 +23,9 @@ export async function syncInstagram(prisma, account) {
         data: { followerCount: infoRes.data.followers_count },
       });
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn(`[instagram] follower count fetch failed for ${account.handle}:`, err.message);
+  }
 
   // Fetch only new media since last sync
   const mediaRes = await axios.get(`${GRAPH_API}/${platformUserId}/media`, {
@@ -76,7 +78,9 @@ export async function syncInstagram(prisma, account) {
           if (m.name === 'saved')       saves       = m.values?.[0]?.value || 0;
           if (m.name === 'shares')      shares      = m.values?.[0]?.value || 0;
         }
-      } catch (_) {}
+      } catch (err) {
+        console.warn(`[instagram] insights fetch failed for post ${item.id}:`, err.message);
+      }
     }
 
     // Upsert metric — update latest row if exists, otherwise create
@@ -109,7 +113,9 @@ export async function syncInstagram(prisma, account) {
             create: { postId: post.id, platformCommentId: c.id, authorName: c.username ?? null, body: c.text, postedAt: new Date(c.timestamp) },
           });
         }
-      } catch (_) {}
+      } catch (err) {
+        console.warn(`[instagram] comments fetch failed for post ${item.id}:`, err.message);
+      }
     }
   }
 }
