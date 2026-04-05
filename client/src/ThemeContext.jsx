@@ -308,7 +308,7 @@ export function ThemeProvider({ children }) {
     try { localStorage.setItem('ncm_theme', key) } catch {}
   }
 
-  const theme = THEMES[themeKey] || THEMES.default
+  const theme = Object.hasOwn(THEMES, themeKey) ? THEMES[themeKey] : THEMES.default
 
   return (
     <ThemeContext.Provider value={{ theme, themeKey, setTheme, themes: THEMES }}>
