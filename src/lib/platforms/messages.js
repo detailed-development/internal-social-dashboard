@@ -1,7 +1,54 @@
 import axios from 'axios';
 
 const GRAPH_API = 'https://graph.facebook.com/v19.0';
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Spam scoring heuristics. Each matched rule adds to the score.
+// A conversation scoring >= SPAM_THRESHOLD is auto-hidden on first sync.
+// Manual hide/unhide always takes precedence (we never override a conversation
+// that was already manually reviewed).
+const SPAM_THRESHOLD = 3;
+
+const SPAM_KEYWORDS = [
+  // Promotional outreach
+  'check my profile', 'check out my', 'visit my profile', 'follow me back',
+  'follow for follow', 'f4f', 'l4l', 'like for like',
+  // Collab / promo spam
+  'paid promotion', 'promo collab', 'collaboration offer', 'brand deal',
+  'sponsored post', 'influencer', 'ambassador',
+  // Generic money spam
+  'make money', 'earn money', 'work from home', 'passive income',
+  'financial freedom', 'investment opportunity', 'crypto',
+  // Generic link bait
+  'click the link', 'link in bio', 'check the link', 'dm for link',
+  'swipe up', 'tap the link',
+  // Generic solicitation
+  'buy followers', 'get followers', 'boost your', 'grow your account',
+  'increase your followers',
+];
+
+const URL_PATTERN = /https?:\/\/\S+|bit\.ly\/\S+|t\.co\/\S+|linktr\.ee\/\S+/i;
+
+function spamScore(messages) {
+  // Only auto-hide if the page has never replied — if we've engaged, keep it visible
+  const hasPageReply = messages.some(m => m.isFromPage);
+  if (hasPageReply) return 0;
+
+  let score = 0;
+  const allText = messages.map(m => m.body.toLowerCase()).join(' ');
+
+  // URL in any message
+  if (URL_PATTERN.test(allText)) score += 3;
+
+  // Spam keyword matches
+  for (const kw of SPAM_KEYWORDS) {
+    if (allText.includes(kw)) score += 2;
+  }
+
+  // Single cold-open message with no follow-up (classic bot behaviour)
+  if (messages.length === 1) score += 1;
+
+  return score;
+}
 
 /**
  * Sync recent DM conversations for an Instagram or Facebook account.
@@ -82,6 +129,7 @@ export async function syncMessages(prisma, account) {
     });
 
     // Fetch the most recent messages in this conversation (up to 20)
+    let syncedMessages = [];
     try {
       const msgRes = await axios.get(`${GRAPH_API}/${convo.id}/messages`, {
         params: {
@@ -115,9 +163,24 @@ export async function syncMessages(prisma, account) {
             isFromPage,
           },
         });
+
+        syncedMessages.push({ body, isFromPage });
       }
     } catch (_) {
       // Individual message fetch failures are non-fatal
+    }
+
+    // Auto-hide obvious spam — only on first sync (isHidden is still false) so we
+    // never override a manual unhide decision made by the user.
+    if (!conversation.isHidden && syncedMessages.length > 0) {
+      const score = spamScore(syncedMessages);
+      if (score >= SPAM_THRESHOLD) {
+        await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { isHidden: true },
+        });
+        console.log(`    Auto-hidden spam conversation (score ${score}) from ${other?.name ?? 'unknown'}`);
+      }
     }
 
     await prisma.conversation.update({

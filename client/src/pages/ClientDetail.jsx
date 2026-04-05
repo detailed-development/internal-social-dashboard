@@ -84,7 +84,7 @@ export default function ClientDetail() {
         // Load messages if any IG/FB accounts exist
         if (hasSocial && clientData.socialAccounts.some(a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK')) {
           setMessagesLoading(true)
-          getMessages(slug).then(setMessages).catch(() => {}).finally(() => setMessagesLoading(false))
+          getMessages(slug, { includeHidden: true }).then(setMessages).catch(() => {}).finally(() => setMessagesLoading(false))
         }
       })
       .catch(() => {})
