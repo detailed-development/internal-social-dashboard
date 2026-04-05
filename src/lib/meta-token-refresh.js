@@ -26,6 +26,30 @@ export async function exchangeToken() {
   return json.access_token;
 }
 
+// Exchange a provided short-lived token for a long-lived token.
+// Use this when re-authorizing with new scopes — paste the fresh short-lived
+// token from Graph API Explorer and this will return a 60-day token.
+export async function exchangeTokenFrom(shortLivedToken) {
+  const { META_APP_ID, META_APP_SECRET } = process.env;
+
+  if (!META_APP_ID || !META_APP_SECRET) {
+    throw new Error('META_APP_ID and META_APP_SECRET must be set in .env');
+  }
+
+  const url =
+    `https://graph.facebook.com/oauth/access_token` +
+    `?grant_type=fb_exchange_token` +
+    `&client_id=${META_APP_ID}` +
+    `&client_secret=${META_APP_SECRET}` +
+    `&fb_exchange_token=${shortLivedToken}`;
+
+  const res = await fetch(url);
+  const json = await res.json();
+
+  if (json.error) throw new Error(`Meta token exchange: ${json.error.message}`);
+  return json.access_token;
+}
+
 // Write the new token to .env and update the running process.
 export function persistToken(newToken) {
   let envContent = fs.readFileSync(ENV_PATH, 'utf8');
