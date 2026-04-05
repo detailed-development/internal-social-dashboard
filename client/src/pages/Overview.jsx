@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getOverview } from '../api'
 import StatCard from '../components/StatCard'
+import { useTheme } from '../ThemeContext'
 
 export default function Overview() {
+  const { theme } = useTheme()
   const [data, setData] = useState(null)
   const [error, setError] = useState(false)
 
@@ -13,8 +15,8 @@ export default function Overview() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
-        <p className="text-gray-500 text-sm mt-1">Last 30 days across all clients</p>
+        <h2 className={`text-2xl font-bold ${theme.heading}`}>Overview</h2>
+        <p className={`text-sm mt-1 ${theme.subtext}`}>Last 30 days across all clients</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -34,15 +36,15 @@ export default function Overview() {
       )}
 
       {!data && !error && (
-        <div className="mt-10 text-center text-gray-400 text-sm">
+        <div className={`mt-10 text-center text-sm ${theme.muted}`}>
           Loading...
         </div>
       )}
 
       {data && data.activeClients === 0 && (
-        <div className="mt-10 bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-          <p className="text-indigo-800 font-medium">No clients yet</p>
-          <p className="text-indigo-500 text-sm mt-1">
+        <div className={`mt-10 border rounded-xl p-6 text-center ${theme.overview0ClientsBg}`}>
+          <p className={`font-medium ${theme.overview0ClientsText}`}>No clients yet</p>
+          <p className={`text-sm mt-1 ${theme.overview0ClientsSub}`}>
             Add a client via the API and connect their social accounts to get started.
           </p>
         </div>
