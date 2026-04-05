@@ -1,3 +1,4 @@
+import { useTheme } from '../ThemeContext'
 import PlatformBadge from './PlatformBadge'
 
 function fmt(n) {
@@ -7,22 +8,23 @@ function fmt(n) {
 }
 
 export default function PostCard({ post, platform }) {
+  const { theme } = useTheme()
   const m = post.metrics?.[0]
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+    <div className={`border rounded-xl p-4 flex flex-col gap-3 ${theme.card}`}>
       <div className="flex items-center justify-between">
         <PlatformBadge platform={platform} />
-        <span className="text-xs text-gray-400">
+        <span className={`text-xs ${theme.muted}`}>
           {new Date(post.publishedAt).toLocaleDateString()}
         </span>
       </div>
 
       {post.caption && (
-        <p className="text-sm text-gray-700 line-clamp-3">{post.caption}</p>
+        <p className={`text-sm line-clamp-3 ${theme.body}`}>{post.caption}</p>
       )}
 
       {m && (
-        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-100">
+        <div className={`grid grid-cols-4 gap-2 pt-2 border-t ${theme.cardDivider}`}>
           {[
             { label: 'Likes',     value: fmt(m.likes) },
             { label: 'Comments',  value: fmt(m.commentsCount) },
@@ -30,8 +32,8 @@ export default function PostCard({ post, platform }) {
             { label: 'Saves',     value: fmt(m.saves) },
           ].map(({ label, value }) => (
             <div key={label} className="text-center">
-              <p className="text-sm font-semibold text-gray-900">{value}</p>
-              <p className="text-xs text-gray-400">{label}</p>
+              <p className={`text-sm font-semibold ${theme.heading}`}>{value}</p>
+              <p className={`text-xs ${theme.muted}`}>{label}</p>
             </div>
           ))}
         </div>

@@ -1,14 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState, useMemo } from 'react'
 import { getClients } from '../api'
+import { useTheme } from '../ThemeContext'
 
 function ClientLink({ client }) {
+  const { theme } = useTheme()
   return (
     <NavLink
       to={`/clients/${client.slug}`}
       className={({ isActive }) =>
         `flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-          isActive ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+          isActive ? theme.navItemActive : theme.navItemInactive
         }`
       }
     >
@@ -22,6 +24,7 @@ function ClientLink({ client }) {
 }
 
 export default function Layout() {
+  const { theme } = useTheme()
   const [clients, setClients] = useState([])
   const [search, setSearch] = useState('')
   const [view, setView] = useState('grouped') // 'grouped' | 'az'
@@ -62,22 +65,24 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <aside className="w-64 bg-gray-900 flex flex-col flex-shrink-0">
+    <div className={`flex h-screen overflow-hidden ${theme.appBg}`}>
+      <aside className={`w-64 flex flex-col flex-shrink-0 ${theme.sidebar}`}>
         {/* Branding */}
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h1 className="text-white font-semibold text-base tracking-tight">NCM Social</h1>
-          <p className="text-gray-500 text-xs mt-0.5">Dashboard</p>
+        <div className={`px-5 py-4 border-b ${theme.sidebarBorder}`}>
+          <h1 className={`font-semibold text-base tracking-tight ${theme.brandText}`}>
+            {theme.id === 'neon-cactus' ? '🌵 NCM Social' : 'NCM Social'}
+          </h1>
+          <p className={`text-xs mt-0.5 ${theme.brandSub}`}>Dashboard</p>
         </div>
 
         {/* Nav */}
-        <div className="px-3 py-3 border-b border-gray-800">
+        <div className={`px-3 py-3 border-b ${theme.sidebarBorder}`}>
           <NavLink
             to="/"
             end
             className={({ isActive }) =>
               `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                isActive ? theme.navItemActive : theme.navItemInactive
               }`
             }
           >
@@ -86,13 +91,13 @@ export default function Layout() {
         </div>
 
         {/* Search + view toggle */}
-        <div className="px-3 py-3 border-b border-gray-800 space-y-2">
+        <div className={`px-3 py-3 border-b ${theme.sidebarBorder} space-y-2`}>
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search clients..."
-            className="w-full bg-gray-800 text-gray-200 text-sm placeholder-gray-500 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className={`w-full text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 ${theme.searchInput}`}
           />
           <div className="flex gap-1">
             {[['grouped', 'Grouped'], ['az', 'A–Z']].map(([key, label]) => (
@@ -100,9 +105,7 @@ export default function Layout() {
                 key={key}
                 onClick={() => setView(key)}
                 className={`flex-1 text-xs py-1 rounded-md transition-colors ${
-                  view === key
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                  view === key ? theme.viewBtnActive : theme.viewBtnInactive
                 }`}
               >
                 {label}
@@ -116,27 +119,27 @@ export default function Layout() {
           {view === 'az' ? (
             <>
               {filtered.length === 0 && (
-                <p className="text-gray-600 text-xs px-3 py-2">No clients found</p>
+                <p className={`text-xs px-3 py-2 ${theme.noClients}`}>No clients found</p>
               )}
               {filtered.map(c => <ClientLink key={c.id} client={c} />)}
             </>
           ) : (
             <>
               {grouped.length === 0 && (
-                <p className="text-gray-600 text-xs px-3 py-2">No clients found</p>
+                <p className={`text-xs px-3 py-2 ${theme.noClients}`}>No clients found</p>
               )}
               {grouped.map(([key, { label, color, clients: groupClients }]) => (
                 <div key={key} className="mb-1">
                   <button
                     onClick={() => toggleGroup(key)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${theme.groupBtn}`}
                   >
                     <span
                       className="w-2 h-2 rounded-sm flex-shrink-0"
                       style={{ backgroundColor: color }}
                     />
                     <span className="flex-1 text-left truncate">{label}</span>
-                    <span className="text-gray-600">{collapsed[key] ? '›' : '⌄'}</span>
+                    <span className={theme.groupArrow}>{collapsed[key] ? '›' : '⌄'}</span>
                   </button>
                   {!collapsed[key] && (
                     <div className="ml-2 mt-0.5 space-y-0.5">
@@ -150,12 +153,12 @@ export default function Layout() {
         </nav>
 
         {/* Admin link */}
-        <div className="px-3 py-3 border-t border-gray-800">
+        <div className={`px-3 py-3 border-t ${theme.sidebarBorder}`}>
           <NavLink
             to="/admin"
             className={({ isActive }) =>
               `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+                isActive ? theme.adminLinkActive : theme.adminLinkInactive
               }`
             }
           >

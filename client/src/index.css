@@ -1,3 +1,54 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Neon Cactus Theme Animations & Effects ──────────────────────────────── */
+
+@keyframes neon-flicker {
+  0%, 92%, 96%, 100% { opacity: 1; }
+  93%, 95%           { opacity: 0.7; }
+}
+
+@keyframes neon-pulse {
+  0%, 100% { text-shadow: 0 0 6px #a3e635, 0 0 12px #a3e635, 0 0 20px #a3e635; }
+  50%       { text-shadow: 0 0 10px #a3e635, 0 0 20px #a3e635, 0 0 35px #a3e635; }
+}
+
+@keyframes cactus-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* Neon brand text in sidebar */
+.neon-brand {
+  animation: neon-flicker 8s infinite, neon-pulse 3s ease-in-out infinite;
+}
+
+/* Neon glow on active nav items */
+.neon-active {
+  box-shadow: 0 0 8px #a3e635, 0 0 16px rgba(163, 230, 53, 0.4);
+}
+
+/* Fun card hover effect in neon cactus */
+.neon-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.neon-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(217, 70, 239, 0.18), 0 0 0 1px rgba(217, 70, 239, 0.12);
+}
+
+/* Buzzword tags pop effect */
+.neon-buzzword {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  cursor: default;
+}
+.neon-buzzword:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(132, 204, 22, 0.35);
+}

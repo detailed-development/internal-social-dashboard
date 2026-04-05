@@ -9,6 +9,7 @@ import PostCard from '../components/PostCard'
 import EngagementChart from '../components/EngagementChart'
 import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
+import { useTheme } from '../ThemeContext'
 
 function fmt(n) {
   if (!n) return '0'
@@ -19,6 +20,7 @@ function fmt(n) {
 
 export default function ClientDetail() {
   const { slug } = useParams()
+  const { theme } = useTheme()
   const [client, setClient] = useState(null)
   const [buzzwords, setBuzzwords] = useState([])
   const [webData, setWebData] = useState(null)
@@ -167,7 +169,7 @@ export default function ClientDetail() {
   }
 
   if (!client) {
-    return <div className="p-8 text-gray-400 text-sm">Loading...</div>
+    return <div className={`p-8 text-sm ${theme.muted}`}>Loading...</div>
   }
 
   const allPosts = client.socialAccounts
@@ -200,13 +202,13 @@ export default function ClientDetail() {
             {client.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{client.name}</h2>
+            <h2 className={`text-2xl font-bold ${theme.heading}`}>{client.name}</h2>
             <div className="flex gap-2 mt-1">
               {client.socialAccounts.map(a => (
                 <PlatformBadge key={a.id} platform={a.platform} />
               ))}
               {client.gaPropertyId && (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">GA4</span>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${theme.ga4Badge}`}>GA4</span>
               )}
             </div>
           </div>
@@ -219,9 +221,7 @@ export default function ClientDetail() {
             onClick={() => setShowSettings(v => !v)}
             title="Client settings"
             className={`p-2 rounded-lg border transition-colors ${
-              showSettings
-                ? 'border-indigo-300 bg-indigo-50 text-indigo-600'
-                : 'border-gray-200 bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              showSettings ? theme.btnGearActive : theme.btnGearInactive
             }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -231,19 +231,19 @@ export default function ClientDetail() {
           </button>
 
           {showSettings && (
-            <div className="absolute right-0 top-10 z-50 w-80 rounded-xl border border-gray-200 bg-white shadow-lg p-4 space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Client Settings</p>
+            <div className={`absolute right-0 top-10 z-50 w-80 rounded-xl border p-4 space-y-4 ${theme.settingsPanel}`}>
+              <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.settingsHeading}`}>Client Settings</p>
 
               {/* Social tab toggle */}
               <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
-                <span className="text-sm text-gray-700">Show Social tab</span>
+                <span className={`text-sm ${theme.settingsLabel}`}>Show Social tab</span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={showSocial}
                   onClick={() => handleToggleSocial(!showSocial)}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    showSocial ? 'bg-indigo-600' : 'bg-gray-300'
+                    showSocial ? theme.toggleOn : theme.toggleOff
                   }`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
@@ -254,7 +254,7 @@ export default function ClientDetail() {
 
               {/* Add social account */}
               <form onSubmit={handleAddSocial}>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-2">Add Social Account</p>
+                <p className={`text-xs font-semibold uppercase tracking-[0.18em] mb-2 ${theme.settingsHeading}`}>Add Social Account</p>
                 <div className="flex gap-1 mb-2">
                   {['INSTAGRAM', 'FACEBOOK'].map(p => (
                     <button
@@ -266,7 +266,7 @@ export default function ClientDetail() {
                           ? p === 'INSTAGRAM'
                             ? 'border-pink-400 bg-pink-50 text-pink-700'
                             : 'border-blue-400 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                          : `border-gray-200 text-gray-500 hover:bg-gray-50 ${theme.card.includes('gray-700') ? 'bg-gray-700' : 'bg-white'}`
                       }`}
                     >
                       {p === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
@@ -279,12 +279,12 @@ export default function ClientDetail() {
                     value={socialHandle}
                     onChange={e => { setSocialHandle(e.target.value); setAddSocialError('') }}
                     placeholder={socialPlatform === 'FACEBOOK' ? 'facebook.com/pagename' : '@handle'}
-                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none"
+                    className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
                   />
                   <button
                     type="submit"
                     disabled={addingSocial || !socialHandle.trim()}
-                    className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed"
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${theme.btnPrimary}`}
                   >
                     {addingSocial ? '…' : 'Link'}
                   </button>
@@ -299,25 +299,25 @@ export default function ClientDetail() {
       </div>
 
       {/* GA4 Card */}
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+      <div className={`mb-6 rounded-xl border p-4 ${theme.card}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-[0.2em]">GA4 connection</p>
-            <p className="text-sm text-gray-700">
+            <p className={`text-xs uppercase tracking-[0.2em] ${theme.muted}`}>GA4 connection</p>
+            <p className={`text-sm ${theme.body}`}>
               {client.gaPropertyId ? (
-                <>Property ID <span className="font-semibold text-gray-900">{client.gaPropertyId}</span></>
+                <>Property ID <span className={`font-semibold ${theme.heading}`}>{client.gaPropertyId}</span></>
               ) : (
                 <>No GA4 property linked yet.</>
               )}
             </p>
             {client.websiteUrl && (
-              <p className="text-xs text-gray-500 mt-1">Website: {client.websiteUrl}</p>
+              <p className={`text-xs mt-1 ${theme.muted}`}>Website: {client.websiteUrl}</p>
             )}
           </div>
           <button
             type="button"
             onClick={handleOpenGaEdit}
-            className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50"
+            className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition ${theme.gaEditBtn}`}
           >
             {client.gaPropertyId ? 'Edit GA4 link' : 'Link GA4 property'}
           </button>
@@ -326,28 +326,28 @@ export default function ClientDetail() {
         {isEditingGa && (
           <div className="mt-4 space-y-4">
             {loadingProperties && (
-              <div className="text-xs text-gray-500 italic">Loading GA4 properties...</div>
+              <div className={`text-xs italic ${theme.muted}`}>Loading GA4 properties...</div>
             )}
             {propertiesError && (
               <div className="text-xs text-red-500">{propertiesError}</div>
             )}
             {ga4Properties.length > 0 && !loadingProperties && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-600 mb-2">Available GA4 Properties</p>
+                <p className={`text-xs font-semibold uppercase tracking-[0.18em] mb-2 ${theme.subtext}`}>Available GA4 Properties</p>
                 <div className="grid gap-2 mb-4">
                   {ga4Properties.map(prop => (
                     <button
                       key={prop.id}
                       type="button"
                       onClick={() => handleSelectProperty(prop)}
-                      className="w-full text-left rounded-lg border border-gray-200 bg-gray-50 p-3 transition hover:border-indigo-300 hover:bg-indigo-50"
+                      className={`w-full text-left rounded-lg border p-3 transition ${theme.gaPropertyBtn}`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-1 text-sm font-medium text-gray-900">{prop.displayName}</p>
-                          <p className="text-xs text-gray-500">ID: {prop.id}</p>
+                          <p className={`line-clamp-1 text-sm font-medium ${theme.heading}`}>{prop.displayName}</p>
+                          <p className={`text-xs ${theme.muted}`}>ID: {prop.id}</p>
                           {prop.websiteUrl && (
-                            <p className="text-xs text-gray-500 line-clamp-1">{prop.websiteUrl}</p>
+                            <p className={`text-xs line-clamp-1 ${theme.muted}`}>{prop.websiteUrl}</p>
                           )}
                         </div>
                         <input
@@ -363,22 +363,22 @@ export default function ClientDetail() {
               </div>
             )}
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm text-gray-700">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em]">GA4 Property ID</span>
+              <label className={`block text-sm ${theme.body}`}>
+                <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>GA4 Property ID</span>
                 <input
                   value={gaPropertyIdInput}
                   onChange={e => setGaPropertyIdInput(e.target.value)}
                   placeholder="398788290"
-                  className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none"
+                  className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
                 />
               </label>
-              <label className="block text-sm text-gray-700">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em]">Website URL</span>
+              <label className={`block text-sm ${theme.body}`}>
+                <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>Website URL</span>
                 <input
                   value={websiteUrlInput}
                   onChange={e => setWebsiteUrlInput(e.target.value)}
                   placeholder="https://example.com"
-                  className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none"
+                  className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
                 />
               </label>
               <div className="sm:col-span-2 flex flex-col gap-2">
@@ -387,7 +387,7 @@ export default function ClientDetail() {
                     type="button"
                     onClick={handleSaveGaLink}
                     disabled={savingGa}
-                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                    className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition ${theme.btnPrimary}`}
                   >
                     {savingGa ? 'Saving…' : 'Save'}
                   </button>
@@ -399,7 +399,7 @@ export default function ClientDetail() {
                       setGaPropertyIdInput(client.gaPropertyId || '')
                       setWebsiteUrlInput(client.websiteUrl || '')
                     }}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition ${theme.btnCancel}`}
                   >
                     Cancel
                   </button>
@@ -412,15 +412,13 @@ export default function ClientDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className={`flex gap-1 mb-6 border-b ${theme.tabsBar}`}>
         {visibleTabs.map(t => (
           <button
             key={t}
             onClick={() => { setTab(t); persistTab(slug, t) }}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === t
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              tab === t ? theme.tabActive : theme.tabInactive
             }`}
           >
             {t}
@@ -439,29 +437,27 @@ export default function ClientDetail() {
           </div>
 
           {chartData.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-8">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Engagement by Account</h3>
+            <div className={`border rounded-xl p-5 mb-8 ${theme.card}`}>
+              <h3 className={`text-sm font-semibold mb-4 ${theme.body}`}>Engagement by Account</h3>
               <EngagementChart data={chartData} />
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4 mb-8">
             {client.socialAccounts.map(account => (
-              <div key={account.id} className="bg-white border border-gray-200 rounded-xl p-5">
+              <div key={account.id} className={`border rounded-xl p-5 ${theme.card}`}>
                 <div className="flex items-center justify-between mb-3">
                   <PlatformBadge platform={account.platform} />
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    account.tokenStatus === 'ACTIVE'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-yellow-100 text-yellow-700'
+                    account.tokenStatus === 'ACTIVE' ? theme.tokenStatusActive : theme.tokenStatusInactive
                   }`}>
                     {account.tokenStatus}
                   </span>
                 </div>
-                <p className="font-semibold text-gray-900">@{account.handle}</p>
-                <p className="text-sm text-gray-400 mt-0.5">{fmt(account.followerCount)} followers</p>
+                <p className={`font-semibold ${theme.heading}`}>@{account.handle}</p>
+                <p className={`text-sm mt-0.5 ${theme.muted}`}>{fmt(account.followerCount)} followers</p>
                 {account.lastSyncedAt && (
-                  <p className="text-xs text-gray-300 mt-1">
+                  <p className={`text-xs mt-1 ${theme.dimmed}`}>
                     Last synced {new Date(account.lastSyncedAt).toLocaleString()}
                   </p>
                 )}
@@ -471,7 +467,7 @@ export default function ClientDetail() {
 
           {allPosts.length > 0 ? (
             <>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Recent Posts</h3>
+              <h3 className={`text-sm font-semibold mb-3 ${theme.body}`}>Recent Posts</h3>
               <div className="grid grid-cols-2 gap-4 mb-8">
                 {allPosts.slice(0, 10).map(post => (
                   <PostCard key={post.id} post={post} platform={post.platform} />
@@ -479,19 +475,19 @@ export default function ClientDetail() {
               </div>
             </>
           ) : (
-            <div className="text-center text-gray-400 text-sm py-10">
+            <div className={`text-center text-sm py-10 ${theme.muted}`}>
               No posts synced yet. Run the worker to pull data from connected accounts.
             </div>
           )}
 
           {buzzwords.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Buzzwords</h3>
+            <div className={`border rounded-xl p-5 ${theme.card}`}>
+              <h3 className={`text-sm font-semibold mb-4 ${theme.body}`}>Top Buzzwords</h3>
               <div className="flex flex-wrap gap-2">
                 {buzzwords.slice(0, 30).map(b => (
                   <span
                     key={b.word}
-                    className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full"
+                    className={`px-3 py-1 rounded-full ${theme.buzzword}`}
                     style={{ fontSize: Math.max(11, Math.min(20, 11 + Number(b.total_freq))) + 'px' }}
                   >
                     {b.word}
