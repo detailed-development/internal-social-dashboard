@@ -178,6 +178,7 @@ model Conversation {
   messageCount           Int             @default(0) @map("message_count")
   lastMessageAt          DateTime?       @map("last_message_at")
   lastSyncedAt           DateTime?       @map("last_synced_at")
+  isHidden               Boolean         @default(false) @map("is_hidden")
   socialAccount          SocialAccount   @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   messages               DirectMessage[]
 

@@ -13,4 +13,7 @@ export const addSocialAccount = (slug, platform, handle) => api.post(`/clients/$
 export const refreshMetaTokens = (token) => api.post('/admin/refresh-meta-tokens', { token }).then(r => r.data)
 export const triggerAutoRefresh = () => api.get('/admin/refresh-meta-tokens').then(r => r.data)
 export const exchangeShortToken = (shortToken) => api.post('/admin/exchange-short-token', { shortToken }).then(r => r.data)
-export const getMessages = (slug, limit) => api.get(`/messages/client/${slug}`, { params: limit ? { limit } : {} }).then(r => r.data)
+export const getMessages = (slug, { limit, includeHidden } = {}) =>
+  api.get(`/messages/client/${slug}`, { params: { ...(limit ? { limit } : {}), ...(includeHidden ? { includeHidden: 'true' } : {}) } }).then(r => r.data)
+export const hideConversation = (id, hidden) => api.patch(`/messages/conversations/${id}/hide`, { hidden }).then(r => r.data)
+export const lookupSocialHandle = (platform, handle) => api.get('/social/lookup', { params: { platform, handle } }).then(r => r.data)
