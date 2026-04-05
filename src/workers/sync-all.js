@@ -85,6 +85,38 @@ async function syncAllAccounts() {
     }
   }
 
+  // Transcription catch-up: process any video posts missed by the inline trigger
+  // (first sync after feature deploy, transient API errors, etc.)
+  // Limit to 5 per cycle to stay within Whisper rate limits.
+  try {
+    const { transcribeReel, transcribeYouTubeVideo } = await import('../lib/transcribe.js');
+    const untranscribed = await prisma.post.findMany({
+      where: {
+        mediaType: { in: ['REEL', 'VIDEO', 'SHORT'] },
+        transcription: null,
+      },
+      take: 5,
+      orderBy: { publishedAt: 'desc' },
+      select: { id: true, mediaType: true, mediaUrl: true, platformPostId: true },
+    });
+    if (untranscribed.length > 0) {
+      console.log(`  Transcription catch-up: ${untranscribed.length} post(s) pending...`);
+      for (const post of untranscribed) {
+        try {
+          if (post.mediaType === 'REEL') {
+            await transcribeReel(prisma, post);
+          } else {
+            await transcribeYouTubeVideo(prisma, post);
+          }
+        } catch (err) {
+          console.error(`  Transcription catch-up error (${post.id}): ${err.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('  Transcription catch-up block error:', err.message);
+  }
+
   console.log(`[${new Date().toISOString()}] Sync cycle complete.`);
 }
 
