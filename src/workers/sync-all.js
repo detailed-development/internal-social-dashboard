@@ -60,6 +60,29 @@ async function syncAllAccounts() {
     console.error('  ERROR in social sync block:', err.message);
   }
 
+  // Sync DM conversations for Instagram and Facebook accounts
+  try {
+    const { syncMessages } = await import('../lib/platforms/messages.js');
+    const messagingAccounts = await prisma.socialAccount.findMany({
+      where: {
+        tokenStatus: { in: ['ACTIVE', 'PENDING'] },
+        platform: { in: ['INSTAGRAM', 'FACEBOOK'] },
+      },
+      include: { client: true },
+    });
+    for (const account of messagingAccounts) {
+      try {
+        console.log(`  Syncing messages for ${account.client.name} / ${account.platform} (@${account.handle})`);
+        await syncMessages(prisma, account);
+      } catch (err) {
+        const detail = err.response?.data?.error?.message || err.message;
+        console.error(`  ERROR syncing messages for @${account.handle} [${account.platform}]: ${detail}`);
+      }
+    }
+  } catch (err) {
+    console.error('  ERROR in message sync block:', err.message);
+  }
+
   // Sync Google Analytics (only if service account key exists)
   try {
     const { readFileSync } = await import('fs');

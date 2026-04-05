@@ -74,6 +74,7 @@ model SocialAccount {
   followerCount   Int?        @map("follower_count")
   client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   posts           Post[]
+  conversations   Conversation[]
 
   @@unique([platform, platformUserId])
   @@index([clientId])
@@ -166,6 +167,39 @@ model WebAnalytic {
   @@unique([clientId, date, source, medium])
   @@index([clientId, date(sort: Desc)])
   @@map("web_analytics")
+}
+
+model Conversation {
+  id                     String          @id @default(uuid())
+  socialAccountId        String          @map("social_account_id")
+  platformConversationId String          @map("platform_conversation_id")
+  participantName        String?         @map("participant_name")
+  participantId          String?         @map("participant_id")
+  messageCount           Int             @default(0) @map("message_count")
+  lastMessageAt          DateTime?       @map("last_message_at")
+  lastSyncedAt           DateTime?       @map("last_synced_at")
+  socialAccount          SocialAccount   @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  messages               DirectMessage[]
+
+  @@unique([socialAccountId, platformConversationId])
+  @@index([socialAccountId, lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model DirectMessage {
+  id                String       @id @default(uuid())
+  conversationId    String       @map("conversation_id")
+  platformMessageId String       @map("platform_message_id")
+  fromName          String?      @map("from_name")
+  fromId            String?      @map("from_id")
+  body              String
+  sentAt            DateTime     @map("sent_at")
+  isFromPage        Boolean      @default(false) @map("is_from_page")
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, platformMessageId])
+  @@index([conversationId, sentAt(sort: Desc)])
+  @@map("direct_messages")
 }
 
 model Buzzword {

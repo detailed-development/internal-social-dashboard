@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   getClient, getBuzzwords, getWebAnalytics, updateClient,
-  getGa4Properties, addSocialAccount,
+  getGa4Properties, addSocialAccount, getMessages,
 } from '../api'
 import StatCard from '../components/StatCard'
 import PostCard from '../components/PostCard'
 import EngagementChart from '../components/EngagementChart'
 import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
+import MessagesSection from '../components/MessagesSection'
 import { useTheme } from '../ThemeContext'
 
 function fmt(n) {
@@ -24,6 +25,8 @@ export default function ClientDetail() {
   const [client, setClient] = useState(null)
   const [buzzwords, setBuzzwords] = useState([])
   const [webData, setWebData] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [messagesLoading, setMessagesLoading] = useState(false)
   const [tab, setTab] = useState('Social')
 
   function persistTab(slug, value) {
@@ -56,6 +59,7 @@ export default function ClientDetail() {
   useEffect(() => {
     setClient(null)
     setWebData(null)
+    setMessages([])
     setShowSettings(false)
     setSocialHandle('')
     setAddSocialError('')
@@ -71,8 +75,15 @@ export default function ClientDetail() {
         setShowSocial(hasSocial)
         const stored = savedTab(slug)
         const defaultTab = hasSocial ? 'Social' : 'Website Analytics'
-        const resolvedTab = stored && (stored === 'Social' ? hasSocial : true) ? stored : defaultTab
+        const validTabs = ['Social', 'Messages', 'Website Analytics']
+        const resolvedTab = stored && validTabs.includes(stored) && (stored === 'Social' ? hasSocial : true) ? stored : defaultTab
         setTab(resolvedTab)
+
+        // Load messages if any IG/FB accounts exist
+        if (hasSocial && clientData.socialAccounts.some(a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK')) {
+          setMessagesLoading(true)
+          getMessages(slug).then(setMessages).catch(() => {}).finally(() => setMessagesLoading(false))
+        }
       })
       .catch(() => {})
 
@@ -164,8 +175,8 @@ export default function ClientDetail() {
 
   function handleToggleSocial(enabled) {
     setShowSocial(enabled)
-    if (!enabled && tab === 'Social') { setTab('Website Analytics'); persistTab(slug, 'Website Analytics') }
-    if (enabled && tab !== 'Social') { setTab('Social'); persistTab(slug, 'Social') }
+    if (!enabled && (tab === 'Social' || tab === 'Messages')) { setTab('Website Analytics'); persistTab(slug, 'Website Analytics') }
+    if (enabled && tab === 'Website Analytics') { setTab('Social'); persistTab(slug, 'Social') }
   }
 
   if (!client) {
@@ -188,7 +199,14 @@ export default function ClientDetail() {
     saves:  a.posts.reduce((s, p) => s + (p.metrics?.[0]?.saves  || 0), 0),
   }))
 
-  const visibleTabs = showSocial ? ['Social', 'Website Analytics'] : ['Website Analytics']
+  const hasMessagingAccounts = client.socialAccounts.some(
+    a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK'
+  )
+  const visibleTabs = [
+    ...(showSocial ? ['Social'] : []),
+    ...(hasMessagingAccounts ? ['Messages'] : []),
+    'Website Analytics',
+  ]
 
   return (
     <div className="p-8">
@@ -497,6 +515,11 @@ export default function ClientDetail() {
             </div>
           )}
         </>
+      )}
+
+      {/* Messages tab */}
+      {tab === 'Messages' && (
+        <MessagesSection conversations={messages} loading={messagesLoading} />
       )}
 
       {/* Website Analytics tab */}

@@ -12,3 +12,4 @@ export const getGa4Properties = () => api.get('/ga4-properties').then(r => r.dat
 export const addSocialAccount = (slug, platform, handle) => api.post(`/clients/${slug}/add-social`, { platform, handle }).then(r => r.data)
 export const refreshMetaTokens = (token) => api.post('/admin/refresh-meta-tokens', { token }).then(r => r.data)
 export const triggerAutoRefresh = () => api.get('/admin/refresh-meta-tokens').then(r => r.data)
+export const getMessages = (slug, limit) => api.get(`/messages/client/${slug}`, { params: limit ? { limit } : {} }).then(r => r.data)
