@@ -219,3 +219,28 @@ model Buzzword {
   @@index([transcriptionId])
   @@map("buzzwords")
 }
+
+model AiGeneration {
+  id               String    @id @default(uuid())
+  feature          String
+  cacheKey         String    @unique @map("cache_key")
+  clientId         String?   @map("client_id")
+  model            String
+  promptVersion    String    @map("prompt_version")
+  inputHash        String    @map("input_hash")
+  dateRangeStart   DateTime? @map("date_range_start")
+  dateRangeEnd     DateTime? @map("date_range_end")
+  responseFormat   String    @default("markdown") @map("response_format")
+  responseBody     String    @map("response_body")
+  promptTokens     Int       @default(0) @map("prompt_tokens")
+  completionTokens Int       @default(0) @map("completion_tokens")
+  totalTokens      Int       @default(0) @map("total_tokens")
+  latencyMs        Int?      @map("latency_ms")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  expiresAt        DateTime? @map("expires_at")
+
+  @@index([feature, clientId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("ai_generations")
+}

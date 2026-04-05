@@ -17,3 +17,10 @@ export const getMessages = (slug, { limit, includeHidden } = {}) =>
   api.get(`/messages/client/${slug}`, { params: { ...(limit ? { limit } : {}), ...(includeHidden ? { includeHidden: 'true' } : {}) } }).then(r => r.data)
 export const hideConversation = (id, hidden) => api.patch(`/messages/conversations/${id}/hide`, { hidden }).then(r => r.data)
 export const lookupSocialHandle = (platform, handle) => api.get('/social/lookup', { params: { platform, handle } }).then(r => r.data)
+
+// AI features
+export const generateWeeklyInsights = (params) => api.post('/ai/weekly-insights', params).then(r => r.data)
+export const generateCaption = (params) => api.post('/ai/caption-generator', params).then(r => r.data)
+export const extractHashtags = (params) => api.post('/ai/hashtag-extractor', params).then(r => r.data)
+export const generateReportDraft = (params) => api.post('/ai/report-draft', params).then(r => r.data)
+export const rewriteContent = (params) => api.post('/ai/content-rewriter', params).then(r => r.data)

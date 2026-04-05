@@ -10,6 +10,7 @@ import EngagementChart from '../components/EngagementChart'
 import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
 import MessagesSection from '../components/MessagesSection'
+import WeeklyInsightsPanel from '../components/ai/WeeklyInsightsPanel'
 import { useTheme } from '../ThemeContext'
 
 function fmt(n) {
@@ -236,6 +237,7 @@ export default function ClientDetail() {
     ...(showSocial ? ['Social'] : []),
     ...(hasMessagingAccounts ? ['Messages'] : []),
     'Website Analytics',
+    'AI Insights',
   ]
 
   return (
@@ -584,6 +586,10 @@ export default function ClientDetail() {
       {/* Website Analytics tab */}
       {tab === 'Website Analytics' && (
         <WebAnalyticsSection data={webData} />
+      )}
+
+      {tab === 'AI Insights' && (
+        <WeeklyInsightsPanel clientSlug={slug} />
       )}
     </div>
   )
