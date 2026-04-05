@@ -89,7 +89,7 @@ async function syncAllAccounts() {
 
   // Transcription catch-up: process any video posts missed by the inline trigger
   // (first sync after feature deploy, transient API errors, etc.)
-  // Limit to 5 per cycle to stay within Whisper rate limits.
+  // Limit to 3 per platform (up to 6 total) per cycle to stay within Whisper rate limits.
   try {
     const { transcribeReel, transcribeYouTubeVideo } = await import('../lib/transcribe.js');
 
