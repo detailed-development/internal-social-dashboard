@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { refreshMetaTokens, triggerAutoRefresh } from '../api'
+import { refreshMetaTokens, triggerAutoRefresh, exchangeShortToken } from '../api'
 import { useTheme, THEMES } from '../ThemeContext'
 
 function ResultList({ updated, errors, total, theme }) {
@@ -47,6 +47,12 @@ export default function Admin() {
   const [manualResult, setManualResult] = useState(null)
   const [manualError, setManualError] = useState('')
 
+  // Short-lived token exchange state
+  const [shortToken, setShortToken] = useState('')
+  const [exchangeLoading, setExchangeLoading] = useState(false)
+  const [exchangeResult, setExchangeResult] = useState(null)
+  const [exchangeError, setExchangeError] = useState('')
+
   async function handleAutoRefresh() {
     setAutoLoading(true)
     setAutoResult(null)
@@ -58,6 +64,23 @@ export default function Admin() {
       setAutoError(err?.response?.data?.error || 'Auto-refresh failed. Check that META_APP_ID, META_APP_SECRET, and META_USER_TOKEN are all set in .env.')
     } finally {
       setAutoLoading(false)
+    }
+  }
+
+  async function handleExchangeShortToken(e) {
+    e.preventDefault()
+    if (!shortToken.trim()) return
+    setExchangeLoading(true)
+    setExchangeResult(null)
+    setExchangeError('')
+    try {
+      const data = await exchangeShortToken(shortToken.trim())
+      setExchangeResult(data)
+      setShortToken('')
+    } catch (err) {
+      setExchangeError(err?.response?.data?.error || 'Exchange failed.')
+    } finally {
+      setExchangeLoading(false)
     }
   }
 
@@ -212,6 +235,51 @@ export default function Admin() {
         </div>
         {autoError && <p className="mt-3 text-sm text-red-500">{autoError}</p>}
         {autoResult && <ResultList {...autoResult} theme={theme} />}
+      </section>
+
+      {/* ── Exchange short-lived token ── */}
+      <section className={`rounded-xl border p-6 mb-5 ${theme.card}`}>
+        <div className="flex items-start gap-3 mb-4">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme.accentIconBg}`}>
+            <svg className={`w-4 h-4 ${theme.accentIconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className={`font-semibold ${theme.heading}`}>Re-authorize with New Scopes</h3>
+            <p className={`text-sm mt-0.5 ${theme.subtext}`}>
+              Paste a fresh short-lived token here to exchange it for a new long-lived token and save it as <code className={`text-xs px-1 rounded ${theme.code} ${theme.codeText}`}>META_USER_TOKEN</code>. Use this when you've added new permission scopes and need the stored token to reflect them.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleExchangeShortToken} className="space-y-3">
+          <input
+            type="text"
+            value={shortToken}
+            onChange={e => { setShortToken(e.target.value); setExchangeError('') }}
+            placeholder="Paste short-lived user access token…"
+            className={`w-full rounded-lg border px-3 py-2.5 text-sm font-mono focus:outline-none ${theme.input}`}
+          />
+          {exchangeError && <p className="text-sm text-red-500">{exchangeError}</p>}
+          <button
+            type="submit"
+            disabled={exchangeLoading || !shortToken.trim()}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${theme.btnPrimary}`}
+          >
+            {exchangeLoading ? (
+              <>
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Exchanging…
+              </>
+            ) : 'Exchange & Save'}
+          </button>
+        </form>
+
+        {exchangeResult && <ResultList {...exchangeResult} theme={theme} />}
       </section>
 
       {/* ── Manual paste ── */}
