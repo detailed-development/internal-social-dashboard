@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   getClient, getBuzzwords, getWebAnalytics, updateClient,
-  getGa4Properties, addSocialAccount, getMessages,
+  getGa4Properties, addSocialAccount, getMessages, lookupSocialHandle,
 } from '../api'
 import StatCard from '../components/StatCard'
 import PostCard from '../components/PostCard'
@@ -54,6 +54,8 @@ export default function ClientDetail() {
   const [socialHandle, setSocialHandle] = useState('')
   const [addingSocial, setAddingSocial] = useState(false)
   const [addSocialError, setAddSocialError] = useState('')
+  const [handlePreview, setHandlePreview] = useState(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const settingsRef = useRef(null)
 
   useEffect(() => {
@@ -105,6 +107,18 @@ export default function ClientDetail() {
   function extractHandle(platform, raw) {
     const val = raw.trim()
     if (platform === 'INSTAGRAM') return val.replace(/^@/, '')
+    if (platform === 'YOUTUBE') {
+      // Accept: @handle, youtube.com/@handle, youtube.com/channel/UC..., bare handle
+      try {
+        const url = new URL(val.includes('://') ? val : `https://youtube.com/${val}`)
+        const parts = url.pathname.replace(/\/$/, '').split('/').filter(Boolean)
+        // /channel/UCxxx or /@handle
+        const segment = parts[parts.length - 1] || val
+        return segment.startsWith('@') ? segment.slice(1) : segment
+      } catch {
+        return val.replace(/^@/, '')
+      }
+    }
     // Facebook: accept URL or plain handle
     try {
       const url = new URL(val.includes('://') ? val : `https://facebook.com/${val}`)
@@ -117,6 +131,21 @@ export default function ClientDetail() {
     }
   }
 
+  // Debounced handle preview lookup for IG/FB
+  useEffect(() => {
+    if (socialPlatform === 'YOUTUBE') { setHandlePreview(null); return }
+    const handle = extractHandle(socialPlatform, socialHandle)
+    if (!handle || handle.length < 2) { setHandlePreview(null); return }
+    const timer = setTimeout(() => {
+      setPreviewLoading(true)
+      lookupSocialHandle(socialPlatform, handle)
+        .then(data => setHandlePreview(data))
+        .catch(() => setHandlePreview(null))
+        .finally(() => setPreviewLoading(false))
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [socialHandle, socialPlatform])
+
   async function handleAddSocial(e) {
     e.preventDefault()
     const handle = extractHandle(socialPlatform, socialHandle)
@@ -128,6 +157,7 @@ export default function ClientDetail() {
       const refreshed = await getClient(slug)
       setClient(refreshed)
       setSocialHandle('')
+      setHandlePreview(null)
       setShowSocial(true)
       setTab('Social')
     } catch (err) {
@@ -274,20 +304,22 @@ export default function ClientDetail() {
               <form onSubmit={handleAddSocial}>
                 <p className={`text-xs font-semibold uppercase tracking-[0.18em] mb-2 ${theme.settingsHeading}`}>Add Social Account</p>
                 <div className="flex gap-1 mb-2">
-                  {['INSTAGRAM', 'FACEBOOK'].map(p => (
+                  {[
+                    { value: 'INSTAGRAM', label: 'Instagram', active: 'border-pink-400 bg-pink-50 text-pink-700' },
+                    { value: 'FACEBOOK',  label: 'Facebook',  active: 'border-blue-400 bg-blue-50 text-blue-700' },
+                    { value: 'YOUTUBE',   label: 'YouTube',   active: 'border-red-400 bg-red-50 text-red-700' },
+                  ].map(p => (
                     <button
-                      key={p}
+                      key={p.value}
                       type="button"
-                      onClick={() => setSocialPlatform(p)}
+                      onClick={() => { setSocialPlatform(p.value); setSocialHandle(''); setHandlePreview(null); setAddSocialError('') }}
                       className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors ${
-                        socialPlatform === p
-                          ? p === 'INSTAGRAM'
-                            ? 'border-pink-400 bg-pink-50 text-pink-700'
-                            : 'border-blue-400 bg-blue-50 text-blue-700'
+                        socialPlatform === p.value
+                          ? p.active
                           : `border-gray-200 text-gray-500 hover:bg-gray-50 ${theme.card.includes('gray-700') ? 'bg-gray-700' : 'bg-white'}`
                       }`}
                     >
-                      {p === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
+                      {p.label}
                     </button>
                   ))}
                 </div>
@@ -296,7 +328,11 @@ export default function ClientDetail() {
                     type="text"
                     value={socialHandle}
                     onChange={e => { setSocialHandle(e.target.value); setAddSocialError('') }}
-                    placeholder={socialPlatform === 'FACEBOOK' ? 'facebook.com/pagename' : '@handle'}
+                    placeholder={
+                      socialPlatform === 'FACEBOOK' ? 'facebook.com/pagename'
+                      : socialPlatform === 'YOUTUBE' ? '@handle or youtube.com/...'
+                      : '@handle'
+                    }
                     className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
                   />
                   <button
@@ -307,6 +343,29 @@ export default function ClientDetail() {
                     {addingSocial ? '…' : 'Link'}
                   </button>
                 </div>
+                {/* Handle preview (IG/FB only) */}
+                {(previewLoading || handlePreview) && socialPlatform !== 'YOUTUBE' && (
+                  <div className={`mt-2 rounded-lg border p-2 flex items-center gap-2 ${theme.code}`}>
+                    {previewLoading ? (
+                      <span className={`text-xs ${theme.muted}`}>Looking up…</span>
+                    ) : handlePreview && (
+                      <>
+                        {handlePreview.avatarUrl && (
+                          <img src={handlePreview.avatarUrl} alt="" className="w-7 h-7 rounded-full flex-shrink-0 object-cover" />
+                        )}
+                        <div className="min-w-0">
+                          <p className={`text-xs font-semibold truncate ${theme.heading}`}>{handlePreview.displayName || handlePreview.handle}</p>
+                          {handlePreview.followerCount != null && (
+                            <p className={`text-xs ${theme.muted}`}>{fmt(handlePreview.followerCount)} followers</p>
+                          )}
+                          {handlePreview.bio && (
+                            <p className={`text-xs truncate ${theme.muted}`}>{handlePreview.bio}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 {addSocialError && (
                   <p className="mt-1 text-xs text-red-500">{addSocialError}</p>
                 )}

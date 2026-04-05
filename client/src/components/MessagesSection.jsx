@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from '../ThemeContext'
 import PlatformBadge from './PlatformBadge'
+import { hideConversation } from '../api/index'
 
 function timeAgo(dateStr) {
   if (!dateStr) return ''
@@ -15,15 +16,27 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString()
 }
 
-function ConversationRow({ convo }) {
+function ConversationRow({ convo, onHideToggle }) {
   const { theme } = useTheme()
   const [expanded, setExpanded] = useState(false)
+  const [hiding, setHiding] = useState(false)
 
   const sortedMessages = [...convo.messages].sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt))
   const preview = sortedMessages[sortedMessages.length - 1]
 
+  async function handleHide(e) {
+    e.stopPropagation()
+    setHiding(true)
+    try {
+      await hideConversation(convo.id, !convo.isHidden)
+      onHideToggle(convo.id, !convo.isHidden)
+    } finally {
+      setHiding(false)
+    }
+  }
+
   return (
-    <div className={`border rounded-xl overflow-hidden ${theme.card}`}>
+    <div className={`border rounded-xl overflow-hidden ${theme.card} ${convo.isHidden ? 'opacity-50' : ''}`}>
       {/* Conversation header / preview row */}
       <button
         type="button"
@@ -42,6 +55,9 @@ function ConversationRow({ convo }) {
             </span>
             <PlatformBadge platform={convo.platform} />
             <span className={`text-xs ${theme.muted}`}>@{convo.accountHandle}</span>
+            {convo.isHidden && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${theme.code} ${theme.muted}`}>hidden</span>
+            )}
           </div>
 
           {preview && (
@@ -71,6 +87,18 @@ function ConversationRow({ convo }) {
       {/* Expanded message thread */}
       {expanded && (
         <div className={`px-5 py-4 space-y-3 border-t ${theme.cardDivider}`}>
+          {/* Hide / unhide action */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleHide}
+              disabled={hiding}
+              className={`text-xs px-3 py-1 rounded-lg border transition-colors ${theme.code} ${theme.muted} hover:opacity-75`}
+            >
+              {hiding ? '…' : convo.isHidden ? 'Unhide conversation' : 'Hide as spam'}
+            </button>
+          </div>
+
           {sortedMessages.length === 0 ? (
             <p className={`text-sm ${theme.muted}`}>No messages loaded yet.</p>
           ) : (
@@ -105,8 +133,22 @@ function ConversationRow({ convo }) {
   )
 }
 
-export default function MessagesSection({ conversations, loading }) {
+export default function MessagesSection({ conversations: initialConversations, loading, onReload }) {
   const { theme } = useTheme()
+  const [conversations, setConversations] = useState(initialConversations ?? [])
+  const [showHidden, setShowHidden] = useState(false)
+
+  // Keep local state in sync when parent provides fresh data
+  useEffect(() => {
+    if (initialConversations) setConversations(initialConversations)
+  }, [initialConversations])
+
+  function handleHideToggle(id, isHidden) {
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, isHidden } : c))
+  }
+
+  const hiddenCount = conversations.filter(c => c.isHidden).length
+  const visible = showHidden ? conversations : conversations.filter(c => !c.isHidden)
 
   if (loading) {
     return <div className={`text-sm py-10 text-center ${theme.muted}`}>Loading messages…</div>
@@ -127,11 +169,24 @@ export default function MessagesSection({ conversations, loading }) {
 
   return (
     <div className="space-y-3">
-      <p className={`text-xs ${theme.muted}`}>
-        {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} — click a row to expand
-      </p>
-      {conversations.map(c => (
-        <ConversationRow key={c.id} convo={c} />
+      <div className="flex items-center justify-between">
+        <p className={`text-xs ${theme.muted}`}>
+          {visible.length} conversation{visible.length !== 1 ? 's' : ''}
+          {!showHidden && hiddenCount > 0 && ` · ${hiddenCount} hidden`}
+          {visible.length > 0 && ' — click a row to expand'}
+        </p>
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowHidden(v => !v)}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${theme.code} ${theme.muted} hover:opacity-75`}
+          >
+            {showHidden ? 'Hide spam' : `Show ${hiddenCount} hidden`}
+          </button>
+        )}
+      </div>
+      {visible.map(c => (
+        <ConversationRow key={c.id} convo={c} onHideToggle={handleHideToggle} />
       ))}
     </div>
   )
