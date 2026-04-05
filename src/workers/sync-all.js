@@ -19,7 +19,9 @@ async function syncAllAccounts() {
   // Sync social accounts
   try {
     const accounts = await prisma.socialAccount.findMany({
-      where: { tokenStatus: 'ACTIVE' },
+      // Include PENDING so that newly-added YouTube accounts (which start PENDING
+      // and resolve their handle → channel ID on first sync) are not skipped.
+      where: { tokenStatus: { in: ['ACTIVE', 'PENDING'] } },
       include: { client: true },
     });
 
@@ -83,6 +85,56 @@ async function syncAllAccounts() {
     } else {
       console.error('  GA4 sync error:', e.message);
     }
+  }
+
+  // Transcription catch-up: process any video posts missed by the inline trigger
+  // (first sync after feature deploy, transient API errors, etc.)
+  // Limit to 5 per cycle to stay within Whisper rate limits.
+  try {
+    const { transcribeReel, transcribeYouTubeVideo } = await import('../lib/transcribe.js');
+
+    // Query scoped by platform so Facebook VIDEO posts are never sent to
+    // transcribeYouTubeVideo(), and the 5-per-cycle budget isn't wasted on them.
+    const [reels, ytVideos] = await Promise.all([
+      prisma.post.findMany({
+        where: {
+          mediaType: 'REEL',
+          transcription: null,
+          socialAccount: { platform: 'INSTAGRAM' },
+        },
+        take: 3,
+        orderBy: { publishedAt: 'desc' },
+        select: { id: true, mediaType: true, mediaUrl: true, platformPostId: true },
+      }),
+      prisma.post.findMany({
+        where: {
+          mediaType: { in: ['VIDEO', 'SHORT'] },
+          transcription: null,
+          socialAccount: { platform: 'YOUTUBE' },
+        },
+        take: 3,
+        orderBy: { publishedAt: 'desc' },
+        select: { id: true, mediaType: true, mediaUrl: true, platformPostId: true },
+      }),
+    ]);
+
+    const untranscribed = [...reels, ...ytVideos];
+    if (untranscribed.length > 0) {
+      console.log(`  Transcription catch-up: ${untranscribed.length} post(s) pending...`);
+      for (const post of untranscribed) {
+        try {
+          if (post.mediaType === 'REEL') {
+            await transcribeReel(prisma, post);
+          } else {
+            await transcribeYouTubeVideo(prisma, post);
+          }
+        } catch (err) {
+          console.error(`  Transcription catch-up error (${post.id}): ${err.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('  Transcription catch-up block error:', err.message);
   }
 
   console.log(`[${new Date().toISOString()}] Sync cycle complete.`);

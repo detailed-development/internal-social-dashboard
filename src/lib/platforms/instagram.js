@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { transcribeReel } from '../transcribe.js';
 const GRAPH_API = 'https://graph.facebook.com/v19.0';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
@@ -94,6 +95,13 @@ export async function syncInstagram(prisma, account) {
       await prisma.postMetric.create({
         data: { postId: post.id, likes, commentsCount: comments, impressions, reach, shares, saves, videoPlays: 0 },
       });
+    }
+
+    // Background transcription for new Reels (fire and forget)
+    if (isNew && post.mediaType === 'REEL') {
+      transcribeReel(prisma, post).catch(err =>
+        console.error(`    Transcription error (Reel ${post.id}): ${err.message}`)
+      );
     }
 
     // Only fetch comments for new posts (no point re-scanning old ones every cycle)

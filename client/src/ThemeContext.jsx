@@ -83,6 +83,9 @@ export const THEMES = {
     gaPropertySelected: '',
     resultSuccess: 'border-green-100 bg-green-50',
     resultError: 'border-red-100 bg-red-50',
+    mediaBadge: 'bg-violet-100 text-violet-700',
+    transcriptToggle: 'text-violet-600 hover:text-violet-800',
+    transcriptPanel: 'bg-gray-50 text-gray-600 border border-gray-200',
 
     // Charts
     chart: {
@@ -181,6 +184,9 @@ export const THEMES = {
     gaPropertySelected: '',
     resultSuccess: 'border-lime-200 bg-lime-50',
     resultError: 'border-red-100 bg-red-50',
+    mediaBadge: 'bg-lime-100 text-lime-800',
+    transcriptToggle: 'text-fuchsia-600 hover:text-fuchsia-800',
+    transcriptPanel: 'bg-fuchsia-50 text-gray-600 border border-fuchsia-100',
 
     // Charts
     chart: {
@@ -279,6 +285,9 @@ export const THEMES = {
     gaPropertySelected: '',
     resultSuccess: 'border-green-800 bg-green-900',
     resultError: 'border-red-900 bg-red-950',
+    mediaBadge: 'bg-violet-900 text-violet-300',
+    transcriptToggle: 'text-indigo-400 hover:text-indigo-300',
+    transcriptPanel: 'bg-gray-800 text-gray-300 border border-gray-700',
 
     // Charts
     chart: {
