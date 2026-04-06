@@ -2,10 +2,11 @@ import { chatCompletion } from './ai-client.js';
 import { renderTemplate } from './prompt-template.js';
 import { computeCacheKey, hashInput, getCachedResponse, setCachedResponse } from './cache.js';
 
-const MODEL = 'gpt-4o';
+const MODEL = 'gpt-4o-mini';
 
 /**
  * Gather analytics data for a client, formatted as compact text for prompt injection.
+ * Also builds structured chartData for frontend graph rendering.
  */
 async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
   const client = await prisma.client.findUnique({
@@ -17,7 +18,7 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
           posts: {
             where: { publishedAt: { gte: new Date(dateStart), lte: new Date(dateEnd) } },
             orderBy: { publishedAt: 'desc' },
-            take: 20,
+            take: 50,
             include: {
               metrics: { orderBy: { recordedAt: 'desc' }, take: 1 },
               comments: { take: 5, orderBy: { postedAt: 'desc' } },
@@ -30,10 +31,31 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
 
   if (!client) return null;
 
-  // Social summary
+  // ── Chart data structures ──────────────────────────────────────────
+  const chartData = {
+    // Daily engagement by platform: [{ date, instagram_likes, instagram_comments, facebook_likes, ... }]
+    dailyEngagement: [],
+    // Per-platform totals: [{ platform, likes, comments, shares, saves, reach, impressions }]
+    platformTotals: [],
+    // Top posts ranked by engagement: [{ caption, platform, likes, comments, shares, reach, mediaType }]
+    topPosts: [],
+    // Post type breakdown: [{ type, count }]
+    postTypeBreakdown: [],
+    // GA4 daily traffic: [{ date, sessions, users, pageviews, bounceRate }]
+    dailyTraffic: [],
+    // Traffic sources: [{ source, medium, sessions, users }]
+    trafficSources: [],
+  };
+
+  // ── Social summary + chart data ────────────────────────────────────
   const socialLines = [];
+  const dailyMap = new Map(); // date → { platform_metric: value }
+  const allPosts = [];
+
   for (const account of client.socialAccounts) {
     const posts = account.posts;
+    const plat = account.platform.toLowerCase(); // instagram / facebook
+
     if (posts.length === 0) {
       socialLines.push(`${account.platform} @${account.handle}: No posts in this period.`);
       continue;
@@ -46,13 +68,53 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
     const totalReach = posts.reduce((s, p) => s + (p.metrics[0]?.reach || 0), 0);
     const totalImpressions = posts.reduce((s, p) => s + (p.metrics[0]?.impressions || 0), 0);
 
+    chartData.platformTotals.push({
+      platform: account.platform,
+      handle: account.handle,
+      followers: account.followerCount ?? 0,
+      posts: posts.length,
+      likes: totalLikes,
+      comments: totalComments,
+      shares: totalShares,
+      saves: totalSaves,
+      reach: totalReach,
+      impressions: totalImpressions,
+    });
+
     socialLines.push(
       `${account.platform} @${account.handle} (${account.followerCount ?? '?'} followers):`,
       `  Posts: ${posts.length} | Likes: ${totalLikes} | Comments: ${totalComments} | Shares: ${totalShares} | Saves: ${totalSaves}`,
       `  Reach: ${totalReach} | Impressions: ${totalImpressions}`,
     );
 
-    // Top 3 posts by engagement
+    // Build daily engagement map + collect all posts for ranking
+    for (const post of posts) {
+      const m = post.metrics[0] || {};
+      const day = post.publishedAt.toISOString().split('T')[0];
+
+      if (!dailyMap.has(day)) dailyMap.set(day, { date: day });
+      const entry = dailyMap.get(day);
+      entry[`${plat}_likes`] = (entry[`${plat}_likes`] || 0) + (m.likes || 0);
+      entry[`${plat}_comments`] = (entry[`${plat}_comments`] || 0) + (m.commentsCount || 0);
+      entry[`${plat}_reach`] = (entry[`${plat}_reach`] || 0) + (m.reach || 0);
+      entry[`${plat}_impressions`] = (entry[`${plat}_impressions`] || 0) + (m.impressions || 0);
+
+      allPosts.push({
+        caption: (post.caption || '').slice(0, 100).replace(/\n/g, ' '),
+        platform: account.platform,
+        mediaType: post.mediaType,
+        publishedAt: day,
+        likes: m.likes || 0,
+        comments: m.commentsCount || 0,
+        shares: m.shares || 0,
+        saves: m.saves || 0,
+        reach: m.reach || 0,
+        impressions: m.impressions || 0,
+        engagement: (m.likes || 0) + (m.commentsCount || 0) + (m.shares || 0) + (m.saves || 0),
+      });
+    }
+
+    // Top posts for text summary
     const sorted = [...posts].sort((a, b) => {
       const ae = (a.metrics[0]?.likes || 0) + (a.metrics[0]?.commentsCount || 0) + (a.metrics[0]?.shares || 0);
       const be = (b.metrics[0]?.likes || 0) + (b.metrics[0]?.commentsCount || 0) + (b.metrics[0]?.shares || 0);
@@ -68,9 +130,21 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
       );
     }
   }
+
+  // Finalize chart data from social
+  chartData.dailyEngagement = [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date));
+  chartData.topPosts = allPosts.sort((a, b) => b.engagement - a.engagement).slice(0, 10);
+
+  // Post type breakdown
+  const typeCount = {};
+  for (const p of allPosts) {
+    typeCount[p.mediaType] = (typeCount[p.mediaType] || 0) + 1;
+  }
+  chartData.postTypeBreakdown = Object.entries(typeCount).map(([type, count]) => ({ type, count }));
+
   const socialData = socialLines.join('\n');
 
-  // Web analytics (GA4)
+  // ── Web analytics (GA4) + chart data ───────────────────────────────
   let webData = '';
   if (client.gaPropertyId) {
     const webRows = await prisma.webAnalytic.findMany({
@@ -80,7 +154,7 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
         source: 'all',
         medium: 'all',
       },
-      orderBy: { date: 'desc' },
+      orderBy: { date: 'asc' },
     });
 
     if (webRows.length > 0) {
@@ -95,6 +169,22 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
         `Avg Bounce Rate: ${avgBounce.toFixed(1)}% | Avg Session Duration: ${avgDuration.toFixed(1)}s`,
         `Data points: ${webRows.length} days`,
       ].join('\n');
+
+      // Daily traffic chart data
+      chartData.dailyTraffic = webRows.map(r => ({
+        date: r.date.toISOString().split('T')[0],
+        sessions: r.sessions,
+        users: r.users,
+        pageviews: r.pageviews,
+        bounceRate: r.bounceRate ? parseFloat(r.bounceRate.toFixed(1)) : null,
+        avgSessionDuration: r.avgSessionDuration ? parseFloat(r.avgSessionDuration.toFixed(1)) : null,
+      }));
+
+      // Daily engagement text for prompt
+      webData += `\nDaily breakdown (last ${Math.min(webRows.length, 14)} days):\n`;
+      for (const r of webRows.slice(-14)) {
+        webData += `  ${r.date.toISOString().split('T')[0]}: ${r.sessions} sessions, ${r.users} users, ${r.pageviews} pageviews\n`;
+      }
     }
 
     // Traffic sources
@@ -105,16 +195,28 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
         NOT: { source: 'all' },
       },
       orderBy: { sessions: 'desc' },
-      take: 10,
+      take: 15,
     });
 
     if (sources.length > 0) {
+      // Aggregate sources across dates
+      const srcMap = new Map();
+      for (const s of sources) {
+        const key = `${s.source}/${s.medium}`;
+        if (!srcMap.has(key)) srcMap.set(key, { source: s.source, medium: s.medium, sessions: 0, users: 0 });
+        const e = srcMap.get(key);
+        e.sessions += s.sessions;
+        e.users += s.users;
+      }
+      const srcArr = [...srcMap.values()].sort((a, b) => b.sessions - a.sessions).slice(0, 10);
+
+      chartData.trafficSources = srcArr;
       webData += '\nTop traffic sources:\n';
-      webData += sources.map(s => `  ${s.source}/${s.medium}: ${s.sessions} sessions`).join('\n');
+      webData += srcArr.map(s => `  ${s.source}/${s.medium}: ${s.sessions} sessions, ${s.users} users`).join('\n');
     }
   }
 
-  // Buzzwords
+  // ── Buzzwords ──────────────────────────────────────────────────────
   let buzzwords = '';
   try {
     const words = await prisma.$queryRaw`
@@ -135,7 +237,7 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
     }
   } catch (_) {}
 
-  return { client, socialData, webData, buzzwords };
+  return { client, socialData, webData, buzzwords, chartData };
 }
 
 /**
@@ -189,7 +291,7 @@ export async function generateWeeklyInsights(prisma, { clientSlug, dateRangeStar
       { role: 'user', content: userMessage },
     ],
     temperature: 0.6,
-    maxTokens: 2048,
+    maxTokens: 1024,
   });
 
   if (!result.content?.trim()) {
@@ -225,7 +327,17 @@ export async function generateWeeklyInsights(prisma, { clientSlug, dateRangeStar
 }
 
 /**
- * Generate a full client-facing report draft.
+ * Generate a comprehensive client-facing report draft with graph data.
+ *
+ * Returns:
+ *  - report: markdown narrative
+ *  - chartData: structured data for frontend graph rendering
+ *    - dailyEngagement: time-series by platform (likes, comments, reach, impressions)
+ *    - platformTotals: per-platform aggregate metrics
+ *    - topPosts: ranked by engagement score
+ *    - postTypeBreakdown: media type distribution
+ *    - dailyTraffic: GA4 sessions/users/pageviews per day
+ *    - trafficSources: top referral sources
  */
 export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh = false }) {
   const now = new Date();
@@ -235,6 +347,34 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
   const data = await gatherClientAnalytics(prisma, clientSlug, start, end);
   if (!data) return { error: 'Client not found', code: 'CLIENT_NOT_FOUND' };
 
+  // Build a compact daily-engagement table for the prompt so the AI can reference trends
+  let dailyEngagementText = '';
+  if (data.chartData.dailyEngagement.length > 0) {
+    dailyEngagementText = 'Daily social engagement:\n';
+    for (const d of data.chartData.dailyEngagement.slice(-14)) {
+      const parts = [`  ${d.date}:`];
+      for (const key of Object.keys(d)) {
+        if (key !== 'date') parts.push(`${key}=${d[key]}`);
+      }
+      dailyEngagementText += parts.join(' ') + '\n';
+    }
+  }
+
+  // Build top posts table
+  let topPostsText = '';
+  if (data.chartData.topPosts.length > 0) {
+    topPostsText = 'Top 10 posts by engagement:\n';
+    for (const p of data.chartData.topPosts) {
+      topPostsText += `  - [${p.platform}/${p.mediaType}] "${p.caption.slice(0, 60)}..." — ${p.likes} likes, ${p.comments} comments, ${p.shares} shares, ${p.reach} reach\n`;
+    }
+  }
+
+  // Build post type breakdown
+  let postTypeText = '';
+  if (data.chartData.postTypeBreakdown.length > 0) {
+    postTypeText = 'Post type distribution: ' + data.chartData.postTypeBreakdown.map(t => `${t.type}: ${t.count}`).join(', ');
+  }
+
   const { systemMessage, userMessage, version } = renderTemplate('report-draft', {
     clientName: data.client.name,
     dateRangeStart: start,
@@ -242,6 +382,9 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
     socialData: data.socialData || 'No social data available for this period.',
     webData: data.webData,
     buzzwords: data.buzzwords,
+    dailyEngagement: dailyEngagementText,
+    topPosts: topPostsText,
+    postTypeBreakdown: postTypeText,
   });
 
   const inputHash = hashInput({ clientSlug, start, end });
@@ -260,6 +403,7 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
     if (cached) {
       return {
         report: cached.responseBody,
+        chartData: data.chartData,
         cached: true,
         usage: { promptTokens: cached.promptTokens, completionTokens: cached.completionTokens, totalTokens: cached.totalTokens },
         generatedAt: cached.createdAt.toISOString(),
@@ -275,7 +419,7 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
       { role: 'user', content: userMessage },
     ],
     temperature: 0.5,
-    maxTokens: 4096,
+    maxTokens: 3072,
   });
 
   if (!result.content?.trim()) {
@@ -303,6 +447,7 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
 
   return {
     report: result.content,
+    chartData: data.chartData,
     cached: false,
     usage: result.usage,
     generatedAt: now.toISOString(),

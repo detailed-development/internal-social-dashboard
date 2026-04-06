@@ -33,7 +33,12 @@ function sleep(ms) {
 }
 
 /**
- * Call OpenAI chat completion with retry logic and usage tracking.
+ * Call OpenAI chat completion with retry logic, usage tracking, and prompt caching.
+ *
+ * OpenAI automatically caches prompt prefixes >= 1024 tokens for gpt-4o and
+ * >= 2048 tokens for gpt-4o-mini.  Cached input tokens cost 50% less.
+ * We enable `store: true` so the API persists prompts for reuse, and we
+ * report `cachedTokens` so callers can monitor savings.
  *
  * @param {object} opts
  * @param {string} opts.model - 'gpt-4o' or 'gpt-4o-mini'
@@ -41,7 +46,7 @@ function sleep(ms) {
  * @param {'json_object'|'text'} [opts.responseFormat='text']
  * @param {number} [opts.temperature=0.7]
  * @param {number} [opts.maxTokens=2048]
- * @returns {{ content: string, usage: { promptTokens: number, completionTokens: number, totalTokens: number }, latencyMs: number }}
+ * @returns {{ content: string, usage: { promptTokens: number, completionTokens: number, totalTokens: number, cachedTokens: number }, latencyMs: number }}
  */
 export async function chatCompletion({
   model = 'gpt-4o-mini',
@@ -57,6 +62,7 @@ export async function chatCompletion({
     messages,
     temperature,
     max_tokens: maxTokens,
+    store: true,  // Enable OpenAI prompt caching (50% cheaper on cached input tokens)
   };
 
   if (responseFormat === 'json_object') {
@@ -72,6 +78,11 @@ export async function chatCompletion({
 
       const content = response.choices?.[0]?.message?.content ?? '';
       const usage = response.usage ?? {};
+      const cached = usage.prompt_tokens_details?.cached_tokens ?? 0;
+
+      if (cached > 0) {
+        console.log(`[AI] Prompt cache hit: ${cached} of ${usage.prompt_tokens ?? 0} input tokens cached (50% savings on those)`);
+      }
 
       return {
         content,
@@ -79,6 +90,7 @@ export async function chatCompletion({
           promptTokens: usage.prompt_tokens ?? 0,
           completionTokens: usage.completion_tokens ?? 0,
           totalTokens: usage.total_tokens ?? 0,
+          cachedTokens: cached,
         },
         latencyMs,
       };
