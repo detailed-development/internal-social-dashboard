@@ -291,7 +291,7 @@ export async function generateWeeklyInsights(prisma, { clientSlug, dateRangeStar
       { role: 'user', content: userMessage },
     ],
     temperature: 0.6,
-    maxTokens: 1024,
+    maxTokens: 512,
   });
 
   if (!result.content?.trim()) {
