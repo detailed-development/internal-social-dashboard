@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ── Dev services (local development) ──────────────────────────────
   db:
@@ -8,7 +6,7 @@ services:
       - "5433:5432"
     environment:
       POSTGRES_USER: ncm
-      POSTGRES_PASSWORD: ncm
+      POSTGRES_PASSWORD: ncm_local
       POSTGRES_DB: ncm_social
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -22,12 +20,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "npx prisma generate && npm run dev:api"
+    command: sh -c "npx prisma generate && node --watch src/api/server.js"
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://ncm:ncm@db:5432/ncm_social
+      - DATABASE_URL=postgresql://ncm:ncm_local@db:5432/ncm_social
     env_file:
       - .env
     volumes:
@@ -48,7 +46,7 @@ services:
     command: sh -c "npx prisma generate && node src/workers/sync-all.js"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://ncm:ncm@db:5432/ncm_social
+      - DATABASE_URL=postgresql://ncm:ncm_local@db:5432/ncm_social
     env_file:
       - .env
     volumes:
