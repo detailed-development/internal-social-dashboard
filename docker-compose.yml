@@ -1,32 +1,75 @@
 version: '3.8'
 
 services:
-  backend:
+  # ── Dev services (local development) ──────────────────────────────
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ncm
+      POSTGRES_PASSWORD: ncm
+      POSTGRES_DB: ncm_social
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ncm"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
     build:
       context: .
       dockerfile: Dockerfile
+    command: sh -c "npx prisma generate && npm run dev:api"
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GOOGLE_ANALYTICS_KEY_FILE=${GOOGLE_ANALYTICS_KEY_FILE}
-      - GOOGLE_ANALYTICS_VIEW_ID=${GOOGLE_ANALYTICS_VIEW_ID}
-    networks:
-      - app-network
-
-  frontend:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://ncm:ncm@db:5432/ncm_social
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./scripts:/app/scripts
+      - ./.env:/app/.env
+      - ./google-service-account.json:/app/google-service-account.json
+      - ./src/prompts:/app/src/prompts
     depends_on:
-      - backend
-    networks:
-      - app-network
+      db:
+        condition: service_healthy
 
-networks:
-  app-network:
-    driver: bridge
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "npx prisma generate && node src/workers/sync-all.js"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://ncm:ncm@db:5432/ncm_social
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./.env:/app/.env
+      - ./google-service-account.json:/app/google-service-account.json
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - client_modules:/app/node_modules
+
+volumes:
+  pgdata:
+  client_modules:

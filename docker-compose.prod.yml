@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/detailed-development/internal-social-dashboard-backend:latest
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - META_USER_TOKEN=${META_USER_TOKEN}
+      - META_APP_ID=${META_APP_ID}
+      - META_APP_SECRET=${META_APP_SECRET}
+      - GOOGLE_ANALYTICS_KEY_FILE=${GOOGLE_ANALYTICS_KEY_FILE}
+      - GOOGLE_ANALYTICS_VIEW_ID=${GOOGLE_ANALYTICS_VIEW_ID}
+    networks:
+      - app-network
+
+  frontend:
+    image: ghcr.io/detailed-development/internal-social-dashboard-frontend:latest
+    ports:
+      - "80:80"
+    environment:
+      - API_URL=http://backend:3001
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
