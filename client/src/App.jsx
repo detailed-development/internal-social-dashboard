@@ -6,10 +6,16 @@ import ClientDetail from './pages/ClientDetail'
 import Admin from './pages/Admin'
 import AITools from './pages/AITools'
 
+const APP_BASE = '/internal-social-dashboard/app'
+
+function getBasename() {
+  return window.location.pathname.startsWith(APP_BASE) ? APP_BASE : '/'
+}
+
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={getBasename()}>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Overview />} />

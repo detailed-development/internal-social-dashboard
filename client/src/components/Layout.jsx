@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState, useMemo } from 'react'
 import { getClients } from '../api'
 import { useTheme } from '../ThemeContext'
+import AdminBar from './AdminBar'
 
 function ClientLink({ client }) {
   const { theme } = useTheme()
@@ -65,7 +66,9 @@ export default function Layout() {
   }
 
   return (
-    <div className={`flex h-screen overflow-hidden ${theme.appBg}`}>
+    <div className={`flex flex-col h-screen overflow-hidden ${theme.appBg}`}>
+      <AdminBar />
+      <div className="flex flex-1 overflow-hidden">
       <aside className={`w-64 flex flex-col flex-shrink-0 ${theme.sidebar}`}>
         {/* Branding */}
         <div className={`px-5 py-4 border-b ${theme.sidebarBorder}`}>
@@ -188,6 +191,7 @@ export default function Layout() {
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
+      </div>
     </div>
   )
 }
