@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import requireAuth from './middleware/requireAuth.js';
+import axios from 'axios';
 import clientRoutes from './routes/clients.js';
 import postRoutes from './routes/posts.js';
 import analyticsRoutes from './routes/analytics.js';
@@ -15,20 +15,31 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check — no auth required (used by container orchestration)
+// Health check — no auth required
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth is enforced client-side: AuthGate calls the WordPress endpoint directly
-// from the browser so WP session cookies are included automatically.
-// requireAuth (server-side cookie proxy) is imported but not mounted because
-// the dashboard runs on a different origin from WordPress and the browser
-// won't send WP cookies to this domain.
-//
-// Re-enable once the WP endpoint sends CORS headers + sets cookies on
-// .neoncactusmedia.com (so the browser forwards them here too):
-//   app.use(requireAuth);
+// Auth check — proxied server-side to WordPress so the browser never needs
+// to make a cross-origin request. The browser's WP session cookies are sent
+// to app.neoncactusmedia.com (same registrable domain as neoncactusmedia.com)
+// and are forwarded here to WordPress for validation. No CORS configuration
+// on the WP side is required.
+app.get('/api/auth/check', async (req, res) => {
+  const url = process.env.AUTH_CHECK_URL;
+  if (!url) return res.json({ ok: true }); // dev: no WP configured
+
+  try {
+    const { status, data } = await axios.get(url, {
+      headers: { cookie: req.headers.cookie ?? '' },
+      validateStatus: () => true,
+      timeout: 5000,
+    });
+    return res.status(status).json(data);
+  } catch {
+    return res.status(503).json({ error: 'auth_unavailable' });
+  }
+});
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/posts', postRoutes);

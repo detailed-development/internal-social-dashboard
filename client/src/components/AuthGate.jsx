@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
 
-// Called directly from the browser so the browser's own WP session cookies
-// are included automatically — no cross-domain cookie forwarding needed.
-const WP_AUTH_URL = 'https://neoncactusmedia.com/wp-json/ncm/v1/social-dashboard-access'
+// Auth is checked via the Express backend (/api/auth/check) which proxies
+// the request to WordPress server-side. This avoids CORS entirely: the browser
+// makes a same-origin request to Express, Express forwards the WP session
+// cookies (which the browser sends here because neoncactusmedia.com cookies
+// apply to app.neoncactusmedia.com per RFC 6265 domain matching), and
+// WordPress validates the session without any cross-origin configuration.
+const WP_AUTH_URL = '/api/auth/check'
 const WP_LOGIN    = 'https://neoncactusmedia.com/wp-login.php'
 
 // sessionStorage key used to detect redirect loops.
@@ -20,7 +24,7 @@ export default function AuthGate() {
   useEffect(() => {
     setState('checking')
 
-    fetch(WP_AUTH_URL, { credentials: 'include', mode: 'cors' })
+    fetch(WP_AUTH_URL)
       .then(res => {
         if (res.status === 200) {
           sessionStorage.removeItem(LOOP_KEY)
