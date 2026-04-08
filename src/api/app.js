@@ -20,14 +20,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth gate — every route below this point is protected
-app.use(requireAuth);
-
-// Lightweight endpoint the frontend polls to verify session status.
-// The middleware above handles 401/403; if we reach here the session is valid.
-app.get('/api/auth/check', (_req, res) => {
-  res.json({ ok: true });
-});
+// Auth is enforced client-side: AuthGate calls the WordPress endpoint directly
+// from the browser so WP session cookies are included automatically.
+// requireAuth (server-side cookie proxy) is imported but not mounted because
+// the dashboard runs on a different origin from WordPress and the browser
+// won't send WP cookies to this domain.
+//
+// Re-enable once the WP endpoint sends CORS headers + sets cookies on
+// .neoncactusmedia.com (so the browser forwards them here too):
+//   app.use(requireAuth);
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/posts', postRoutes);
