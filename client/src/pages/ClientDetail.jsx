@@ -48,6 +48,9 @@ export default function ClientDetail() {
   const [loadingProperties, setLoadingProperties] = useState(false)
   const [propertiesError, setPropertiesError] = useState('')
 
+  // Platform collapse state
+  const [collapsedPlatforms, setCollapsedPlatforms] = useState({})
+
   // Settings panel state
   const [showSettings, setShowSettings] = useState(false)
   const [showSocial, setShowSocial] = useState(false)
@@ -545,80 +548,9 @@ export default function ClientDetail() {
             </div>
           )}
 
-          {/* Per-platform sections */}
-          {Object.entries(platforms).map(([platformKey, { accounts, posts: platformPosts }]) => {
-            const plLikes    = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.likes         || 0), 0)
-            const plComments = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.commentsCount || 0), 0)
-            const plShares   = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.shares        || 0), 0)
-            const plSaves    = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.saves         || 0), 0)
-            const plReach    = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.reach         || 0), 0)
-            const plFollowers = accounts.reduce((s, a) => s + (a.followerCount || 0), 0)
-            const plEngagement = plLikes + plComments + plShares + plSaves
-            const plER = plFollowers > 0 ? ((plEngagement / (platformPosts.length || 1)) / plFollowers * 100) : 0
-
-            return (
-              <div key={platformKey} className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <PlatformBadge platform={platformKey} />
-                  <h3 className={`text-sm font-semibold ${theme.body}`}>
-                    {accounts.map(a => `@${a.handle}`).join(', ')}
-                  </h3>
-                </div>
-
-                {/* Platform stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
-                  <StatCard label="Followers"       value={fmt(plFollowers)} />
-                  <StatCard label="Engagement"      value={fmt(plEngagement)} sub={`${fmt(plLikes)} likes · ${fmt(plComments)} comments`} />
-                  <StatCard label="Reach"           value={fmt(plReach)} />
-                  <StatCard label="Engagement Rate" value={plER.toFixed(2) + '%'} sub={`${platformPosts.length} posts`} />
-                </div>
-
-                {/* Platform accounts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  {accounts.map(account => (
-                    <div key={account.id} className={`border rounded-xl p-5 ${theme.card}`}>
-                      <div className="flex items-center justify-between mb-3">
-                        <PlatformBadge platform={account.platform} />
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          account.tokenStatus === 'ACTIVE' ? theme.tokenStatusActive : theme.tokenStatusInactive
-                        }`}>
-                          {account.tokenStatus}
-                        </span>
-                      </div>
-                      <p className={`font-semibold ${theme.heading}`}>@{account.handle}</p>
-                      <p className={`text-sm mt-0.5 ${theme.muted}`}>{fmt(account.followerCount)} followers</p>
-                      {account.lastSyncedAt && (
-                        <p className={`text-xs mt-1 ${theme.dimmed}`}>
-                          Last synced {new Date(account.lastSyncedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Platform posts */}
-                {platformPosts.length > 0 && (
-                  <>
-                    <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${theme.muted}`}>Recent Posts</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                      {platformPosts.slice(0, 6).map(post => (
-                        <PostCard key={post.id} post={post} platform={post.platform} />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })}
-
-          {allPosts.length === 0 && (
-            <div className={`text-center text-sm py-10 ${theme.muted}`}>
-              No posts synced yet. Run the worker to pull data from connected accounts.
-            </div>
-          )}
-
+          {/* Buzzwords — above all posts */}
           {buzzwords.length > 0 && (
-            <div className={`border rounded-xl p-5 ${theme.card}`}>
+            <div className={`border rounded-xl p-5 mb-8 ${theme.card}`}>
               <h3 className={`text-sm font-semibold mb-4 ${theme.body}`}>Top Buzzwords</h3>
               <div className="flex flex-wrap gap-2">
                 {buzzwords.slice(0, 30).map(b => (
@@ -631,6 +563,93 @@ export default function ClientDetail() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Per-platform sections — side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {Object.entries(platforms).map(([platformKey, { accounts, posts: platformPosts }]) => {
+              const plLikes    = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.likes         || 0), 0)
+              const plComments = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.commentsCount || 0), 0)
+              const plShares   = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.shares        || 0), 0)
+              const plSaves    = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.saves         || 0), 0)
+              const plReach    = platformPosts.reduce((s, p) => s + (p.metrics?.[0]?.reach         || 0), 0)
+              const plFollowers = accounts.reduce((s, a) => s + (a.followerCount || 0), 0)
+              const plEngagement = plLikes + plComments + plShares + plSaves
+              const plER = plFollowers > 0 ? ((plEngagement / (platformPosts.length || 1)) / plFollowers * 100) : 0
+              const isCollapsed = collapsedPlatforms[platformKey]
+
+              return (
+                <div key={platformKey} className={`border rounded-xl overflow-hidden ${theme.card}`}>
+                  {/* Collapsible header */}
+                  <button
+                    onClick={() => setCollapsedPlatforms(prev => ({ ...prev, [platformKey]: !prev[platformKey] }))}
+                    className={`w-full flex items-center justify-between gap-2 px-5 py-4 text-left transition-colors hover:opacity-80`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <PlatformBadge platform={platformKey} />
+                      <span className={`text-sm font-semibold ${theme.heading}`}>
+                        {accounts.map(a => `@${a.handle}`).join(', ')}
+                      </span>
+                    </div>
+                    <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''} ${theme.muted}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+
+                  {!isCollapsed && (
+                    <div className="px-5 pb-5 space-y-4">
+                      {/* Platform stats */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <StatCard label="Followers"       value={fmt(plFollowers)} />
+                        <StatCard label="Engagement"      value={fmt(plEngagement)} sub={`${fmt(plLikes)} likes · ${fmt(plComments)} comments`} />
+                        <StatCard label="Reach"           value={fmt(plReach)} />
+                        <StatCard label="Engagement Rate" value={plER.toFixed(2) + '%'} sub={`${platformPosts.length} posts`} />
+                      </div>
+
+                      {/* Platform accounts */}
+                      {accounts.map(account => (
+                        <div key={account.id} className={`border rounded-lg p-4 ${theme.cardDivider}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className={`font-semibold text-sm ${theme.heading}`}>@{account.handle}</p>
+                              <p className={`text-xs ${theme.muted}`}>{fmt(account.followerCount)} followers</p>
+                            </div>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              account.tokenStatus === 'ACTIVE' ? theme.tokenStatusActive : theme.tokenStatusInactive
+                            }`}>
+                              {account.tokenStatus}
+                            </span>
+                          </div>
+                          {account.lastSyncedAt && (
+                            <p className={`text-xs mt-1 ${theme.dimmed}`}>
+                              Synced {new Date(account.lastSyncedAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Platform posts */}
+                      {platformPosts.length > 0 && (
+                        <>
+                          <h4 className={`text-xs font-semibold uppercase tracking-wider ${theme.muted}`}>Recent Posts</h4>
+                          <div className="space-y-3">
+                            {platformPosts.slice(0, 4).map(post => (
+                              <PostCard key={post.id} post={post} platform={post.platform} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {allPosts.length === 0 && (
+            <div className={`text-center text-sm py-10 ${theme.muted}`}>
+              No posts synced yet. Run the worker to pull data from connected accounts.
             </div>
           )}
         </>
