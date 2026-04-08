@@ -107,13 +107,12 @@ export default function AuthGate() {
       <div className={`flex items-center justify-center h-screen ${theme.appBg}`}>
         <div className="text-center space-y-4 max-w-sm px-6">
           <div className="text-4xl select-none">🔌</div>
-          <h1 className={`text-xl font-semibold ${theme.heading}`}>Auth endpoint unreachable</h1>
+          <h1 className={`text-xl font-semibold ${theme.heading}`}>Auth check failed</h1>
           <p className={`text-sm ${theme.subtext}`}>
-            The dashboard couldn&apos;t reach the authentication endpoint at{' '}
-            <code className={`text-xs px-1 rounded ${theme.code}`}>
-              /wp-json/ncm/v1/social-dashboard-access
-            </code>
-            . The endpoint may not exist yet, or may be missing CORS headers for this origin.
+            The dashboard couldn&apos;t verify your session. This usually means the
+            WordPress auth endpoint isn&apos;t reachable from the server, or the{' '}
+            <code className={`text-xs px-1 rounded ${theme.code}`}>AUTH_CHECK_URL</code>{' '}
+            environment variable isn&apos;t set on the backend container.
           </p>
           <a
             href={`${WP_LOGIN}?redirect_to=${encodeURIComponent(window.location.href)}`}
