@@ -146,6 +146,7 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
 
   // ── Web analytics (GA4) + chart data ───────────────────────────────
   let webData = '';
+  let avgBounce = null;
   if (client.gaPropertyId) {
     const webRows = await prisma.webAnalytic.findMany({
       where: {
@@ -161,7 +162,7 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
       const totalSessions = webRows.reduce((s, r) => s + r.sessions, 0);
       const totalUsers = webRows.reduce((s, r) => s + r.users, 0);
       const totalPageviews = webRows.reduce((s, r) => s + r.pageviews, 0);
-      const avgBounce = webRows.reduce((s, r) => s + (r.bounceRate || 0), 0) / webRows.length;
+      avgBounce = webRows.reduce((s, r) => s + (r.bounceRate || 0), 0) / webRows.length;
       const avgDuration = webRows.reduce((s, r) => s + (r.avgSessionDuration || 0), 0) / webRows.length;
 
       webData = [
