@@ -211,7 +211,7 @@ export default function ClientDetail() {
   }
 
   if (!client) {
-    return <div className={`p-8 text-sm ${theme.muted}`}>Loading...</div>
+    return <div className={`p-4 sm:p-8 text-sm ${theme.muted}`}>Loading...</div>
   }
 
   const allPosts = client.socialAccounts
@@ -241,7 +241,7 @@ export default function ClientDetail() {
   ]
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -281,7 +281,7 @@ export default function ClientDetail() {
           </button>
 
           {showSettings && (
-            <div className={`absolute right-0 top-10 z-50 w-80 rounded-xl border p-4 space-y-4 ${theme.settingsPanel}`}>
+            <div className={`absolute right-0 top-10 z-50 w-[calc(100vw-2rem)] sm:w-80 max-w-sm rounded-xl border p-4 space-y-4 ${theme.settingsPanel}`}>
               <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.settingsHeading}`}>Client Settings</p>
 
               {/* Social tab toggle */}
@@ -491,12 +491,12 @@ export default function ClientDetail() {
       </div>
 
       {/* Tabs */}
-      <div className={`flex gap-1 mb-6 border-b ${theme.tabsBar}`}>
+      <div className={`flex gap-1 mb-6 border-b overflow-x-auto ${theme.tabsBar}`}>
         {visibleTabs.map(t => (
           <button
             key={t}
             onClick={() => { setTab(t); persistTab(slug, t) }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               tab === t ? theme.tabActive : theme.tabInactive
             }`}
           >
@@ -508,7 +508,7 @@ export default function ClientDetail() {
       {/* Social tab */}
       {tab === 'Social' && showSocial && (
         <>
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
             <StatCard label="Followers"      value={fmt(totalFollowers)} />
             <StatCard label="Total Likes"    value={fmt(totalLikes)} />
             <StatCard label="Total Comments" value={fmt(totalComments)} />
@@ -522,7 +522,7 @@ export default function ClientDetail() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
             {client.socialAccounts.map(account => (
               <div key={account.id} className={`border rounded-xl p-5 ${theme.card}`}>
                 <div className="flex items-center justify-between mb-3">
@@ -547,7 +547,7 @@ export default function ClientDetail() {
           {allPosts.length > 0 ? (
             <>
               <h3 className={`text-sm font-semibold mb-3 ${theme.body}`}>Recent Posts</h3>
-              <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 {allPosts.slice(0, 10).map(post => (
                   <PostCard key={post.id} post={post} platform={post.platform} />
                 ))}

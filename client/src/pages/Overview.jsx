@@ -13,13 +13,13 @@ export default function Overview() {
   }, [])
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-6">
         <h2 className={`text-2xl font-bold ${theme.heading}`}>Overview</h2>
         <p className={`text-sm mt-1 ${theme.subtext}`}>Last 30 days across all clients</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <StatCard label="Active Clients"    value={data?.activeClients} />
         <StatCard label="Posts Published"   value={data?.totalPosts}    sub="last 30 days" />
         <StatCard

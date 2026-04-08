@@ -102,7 +102,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 sm:p-8 max-w-2xl">
       <h2 className={`text-2xl font-bold mb-1 ${theme.heading}`}>Admin Settings</h2>
       <p className={`text-sm mb-8 ${theme.subtext}`}>Internal configuration for the NCM dashboard.</p>
 
@@ -123,7 +123,7 @@ export default function Admin() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {Object.values(THEMES).map(t => {
             const isActive = themeKey === t.id
             return (
