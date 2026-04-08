@@ -69,7 +69,12 @@ export default function ClientDetail() {
     setIsEditingGa(false)
     setSaveError('')
 
-    getClient(slug)
+    // Fire all independent API calls in parallel
+    const clientPromise = getClient(slug)
+    const buzzwordsPromise = getBuzzwords(slug).then(setBuzzwords).catch(() => {})
+    const webPromise = getWebAnalytics(slug).then(setWebData).catch(() => {})
+
+    clientPromise
       .then(clientData => {
         setClient(clientData)
         setGaPropertyIdInput(clientData.gaPropertyId || '')
@@ -89,9 +94,6 @@ export default function ClientDetail() {
         }
       })
       .catch(() => {})
-
-    getBuzzwords(slug).then(setBuzzwords).catch(() => {})
-    getWebAnalytics(slug).then(setWebData).catch(() => {})
   }, [slug])
 
   // Close settings panel on outside click
