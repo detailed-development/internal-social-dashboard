@@ -66,8 +66,21 @@ router.get('/client/:slug/web', async (req, res) => {
       where: {
         clientId: client.id,
         date: today,
-        NOT: { source: 'all' },
+        source: { notIn: ['all', '_device', '_page'] },
       },
+      orderBy: { sessions: 'desc' },
+      take: 10,
+    });
+
+    // Device breakdown
+    const devices = await prisma.webAnalytic.findMany({
+      where: { clientId: client.id, date: today, source: '_device' },
+      orderBy: { sessions: 'desc' },
+    });
+
+    // Top landing pages
+    const pages = await prisma.webAnalytic.findMany({
+      where: { clientId: client.id, date: today, source: '_page' },
       orderBy: { sessions: 'desc' },
       take: 10,
     });
@@ -88,12 +101,16 @@ router.get('/client/:slug/web', async (req, res) => {
       ? daily.reduce((s, r) => s + (r.avgSessionDuration || 0), 0) / daily.length
       : null;
 
+    const engagementRate = avgBounceRate != null ? 1 - avgBounceRate : null;
+
     res.json({
       gaPropertyId: client.gaPropertyId,
       websiteUrl:   client.websiteUrl,
-      totals:       { ...totals, avgBounceRate, avgSessionDuration },
+      totals:       { ...totals, avgBounceRate, avgSessionDuration, engagementRate },
       daily,
       sources,
+      devices: devices.map(d => ({ device: d.medium, sessions: d.sessions, users: d.users, pageviews: d.pageviews })),
+      pages: pages.map(p => ({ path: p.medium, sessions: p.sessions, users: p.users, pageviews: p.pageviews })),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

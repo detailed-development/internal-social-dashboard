@@ -192,14 +192,13 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
       where: {
         clientId: client.id,
         date: { gte: new Date(dateStart), lte: new Date(dateEnd) },
-        NOT: { source: 'all' },
+        source: { notIn: ['all', '_device', '_page'] },
       },
       orderBy: { sessions: 'desc' },
       take: 15,
     });
 
     if (sources.length > 0) {
-      // Aggregate sources across dates
       const srcMap = new Map();
       for (const s of sources) {
         const key = `${s.source}/${s.medium}`;
@@ -213,6 +212,41 @@ async function gatherClientAnalytics(prisma, clientSlug, dateStart, dateEnd) {
       chartData.trafficSources = srcArr;
       webData += '\nTop traffic sources:\n';
       webData += srcArr.map(s => `  ${s.source}/${s.medium}: ${s.sessions} sessions, ${s.users} users`).join('\n');
+    }
+
+    // Device breakdown
+    const devices = await prisma.webAnalytic.findMany({
+      where: { clientId: client.id, source: '_device' },
+      orderBy: { sessions: 'desc' },
+    });
+
+    if (devices.length > 0) {
+      const totalDeviceSessions = devices.reduce((s, d) => s + d.sessions, 0);
+      chartData.deviceBreakdown = devices.map(d => ({ device: d.medium, sessions: d.sessions, users: d.users }));
+      webData += '\nDevice breakdown:\n';
+      webData += devices.map(d => {
+        const pct = totalDeviceSessions ? ((d.sessions / totalDeviceSessions) * 100).toFixed(1) : '0';
+        return `  ${d.medium}: ${d.sessions} sessions (${pct}%), ${d.users} users`;
+      }).join('\n');
+    }
+
+    // Top landing pages
+    const pages = await prisma.webAnalytic.findMany({
+      where: { clientId: client.id, source: '_page' },
+      orderBy: { sessions: 'desc' },
+      take: 10,
+    });
+
+    if (pages.length > 0) {
+      chartData.topPages = pages.map(p => ({ path: p.medium, sessions: p.sessions, pageviews: p.pageviews }));
+      webData += '\nTop landing pages:\n';
+      webData += pages.map(p => `  ${p.medium}: ${p.sessions} sessions, ${p.pageviews} pageviews`).join('\n');
+    }
+
+    // Engagement rate (computed from bounce rate)
+    const engagementRate = avgBounce != null ? ((1 - avgBounce) * 100).toFixed(1) : null;
+    if (engagementRate) {
+      webData += `\nEngagement Rate: ${engagementRate}% (1 - bounce rate)`;
     }
   }
 

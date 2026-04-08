@@ -1,6 +1,6 @@
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, BarChart, Bar,
+  Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts'
 import { useTheme } from '../ThemeContext'
 
@@ -23,6 +23,8 @@ function fmtDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+const DEVICE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444']
+
 export default function WebAnalyticsSection({ data }) {
   const { theme } = useTheme()
   const c = theme.chart
@@ -43,7 +45,7 @@ export default function WebAnalyticsSection({ data }) {
     )
   }
 
-  const { totals, daily, sources } = data
+  const { totals, daily, sources, devices = [], pages = [] } = data
 
   const chartData = daily.map(row => ({
     date:      fmtDate(row.date),
@@ -52,11 +54,19 @@ export default function WebAnalyticsSection({ data }) {
     Pageviews: row.pageviews,
   }))
 
-  const sourceData = sources.map(s => ({
+  const sourceData = (sources || []).map(s => ({
     name:     `${s.source} / ${s.medium}`,
     sessions: s.sessions,
     users:    s.users,
   }))
+
+  const deviceData = devices.map(d => ({
+    name: d.device.charAt(0).toUpperCase() + d.device.slice(1),
+    sessions: d.sessions,
+    users: d.users,
+  }))
+
+  const totalDeviceSessions = deviceData.reduce((s, d) => s + d.sessions, 0)
 
   return (
     <div className="space-y-6">
@@ -76,14 +86,16 @@ export default function WebAnalyticsSection({ data }) {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: 'Sessions',         value: fmt(totals.sessions) },
           { label: 'Users',            value: fmt(totals.users) },
           { label: 'New Users',        value: fmt(totals.newUsers) },
           { label: 'Pageviews',        value: fmt(totals.pageviews) },
+          { label: 'Engagement Rate',  value: totals.engagementRate != null ? (totals.engagementRate * 100).toFixed(1) + '%' : '—' },
           { label: 'Avg Bounce Rate',  value: totals.avgBounceRate != null ? (totals.avgBounceRate * 100).toFixed(1) + '%' : '—' },
           { label: 'Avg Session',      value: fmtDuration(totals.avgSessionDuration) },
+          { label: 'Pages / Session',  value: totals.sessions ? (totals.pageviews / totals.sessions).toFixed(1) : '—' },
         ].map(({ label, value }) => (
           <div key={label} className={`border rounded-xl p-4 ${theme.card}`}>
             <p className={`text-xs ${theme.muted}`}>{label}</p>
@@ -109,19 +121,69 @@ export default function WebAnalyticsSection({ data }) {
         </ResponsiveContainer>
       </div>
 
-      {/* Traffic sources */}
-      {sourceData.length > 0 && (
+      {/* Device + Sources side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Device breakdown */}
+        {deviceData.length > 0 && (
+          <div className={`border rounded-xl p-5 ${theme.card}`}>
+            <p className={`text-xs font-semibold mb-4 ${theme.subtext}`}>Device Breakdown</p>
+            <div className="flex items-center gap-6">
+              <ResponsiveContainer width={140} height={140}>
+                <PieChart>
+                  <Pie data={deviceData} dataKey="sessions" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={2}>
+                    {deviceData.map((_, i) => <Cell key={i} fill={DEVICE_COLORS[i % DEVICE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: c.tooltipBg, borderColor: c.grid }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 flex-1">
+                {deviceData.map((d, i) => (
+                  <div key={d.name} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: DEVICE_COLORS[i % DEVICE_COLORS.length] }} />
+                      <span className={theme.body}>{d.name}</span>
+                    </div>
+                    <span className={`font-semibold ${theme.heading}`}>
+                      {totalDeviceSessions ? ((d.sessions / totalDeviceSessions) * 100).toFixed(0) + '%' : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Traffic sources */}
+        {sourceData.length > 0 && (
+          <div className={`border rounded-xl p-5 ${theme.card}`}>
+            <p className={`text-xs font-semibold mb-4 ${theme.subtext}`}>Traffic Sources</p>
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={sourceData.slice(0, 6)} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
+                <XAxis type="number" tick={{ fontSize: 11, fill: c.tickFill }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: c.tickFill }} width={120} />
+                <Tooltip contentStyle={{ backgroundColor: c.tooltipBg, borderColor: c.grid }} />
+                <Bar dataKey="sessions" fill={c.sources} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Top landing pages */}
+      {pages.length > 0 && (
         <div className={`border rounded-xl p-5 ${theme.card}`}>
-          <p className={`text-xs font-semibold mb-4 ${theme.subtext}`}>Traffic Sources</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={sourceData} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={c.grid} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: c.tickFill }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: c.tickFill }} width={140} />
-              <Tooltip contentStyle={{ backgroundColor: c.tooltipBg, borderColor: c.grid }} />
-              <Bar dataKey="sessions" fill={c.sources} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <p className={`text-xs font-semibold mb-4 ${theme.subtext}`}>Top Landing Pages</p>
+          <div className="space-y-2">
+            {pages.slice(0, 8).map((p, i) => (
+              <div key={i} className="flex items-center justify-between text-sm gap-4">
+                <span className={`truncate min-w-0 flex-1 font-mono text-xs ${theme.body}`}>{p.path}</span>
+                <div className="flex gap-4 flex-shrink-0">
+                  <span className={theme.muted}>{fmt(p.sessions)} sessions</span>
+                  <span className={theme.muted}>{fmt(p.pageviews)} views</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

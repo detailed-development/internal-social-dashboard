@@ -11,6 +11,7 @@ Rules:
 - When referencing trends, cite specific dates and numbers from the daily breakdowns.
 - Compare platform performance side-by-side when data exists for multiple platforms.
 - Identify the highest and lowest performing days/posts with specific metrics.
+- When GA4 data is available, ALWAYS provide a thorough website analysis — this is a critical part of the report, not an afterthought.
 ---
 Generate a comprehensive client-facing report for **{{clientName}}** covering **{{dateRangeStart}}** to **{{dateRangeEnd}}**.
 
@@ -45,7 +46,7 @@ Generate a comprehensive client-facing report for **{{clientName}}** covering **
 Please produce these sections with detailed analysis:
 
 ### Executive Summary
-A 4-6 sentence overview of overall performance across all channels. Include the most significant win and the most notable area for improvement. Reference specific numbers.
+A 4-6 sentence overview of overall performance across all channels. Include the most significant win and the most notable area for improvement. Reference specific numbers. If GA4 data exists, include a website performance highlight.
 
 ### Social Performance Deep Dive
 For each platform:
@@ -63,10 +64,13 @@ Side-by-side comparison of Instagram vs Facebook (if both have data):
 
 {{#if webData}}
 ### Website Performance Deep Dive
-- Traffic trend analysis: identify peak days and any notable patterns from the daily breakdown
-- Session quality: bounce rate and session duration trends
-- Traffic source analysis: which channels drive the most and highest-quality traffic
-- Social-to-web correlation: do social engagement spikes correspond to web traffic increases?
+Provide a thorough analysis of ALL available GA4 metrics:
+- **Traffic overview**: Total sessions, users, pageviews — are they trending up or down? Identify peak and low days from the daily breakdown.
+- **Engagement quality**: Engagement rate, bounce rate, avg session duration, pages per session — what do these say about visitor quality?
+- **Device breakdown**: Mobile vs desktop vs tablet split — is the site optimized for the dominant device? Flag any device with notably worse engagement.
+- **Top landing pages**: Which pages attract the most traffic? Are they the right pages? Suggest optimization opportunities.
+- **Traffic sources**: Which channels (organic, social, direct, referral) drive the most and highest-quality traffic? How do social referrals compare?
+- **Social-to-web correlation**: Do social posting days or engagement spikes correlate with web traffic increases? Which platforms drive the most referral traffic?
 {{/if}}
 
 ### Cross-Channel Performance Matrix
@@ -74,17 +78,19 @@ How social and web performance relate:
 - Social engagement → website traffic correlation
 - Top referring platforms
 - Content themes that drive cross-channel performance
+- Device usage patterns across channels
 
 ### Key Learnings & Insights
 - What content types and themes performed best and why
 - Audience engagement patterns (timing, format preferences)
+- Website visitor behavior insights (if GA4 data available)
 - Growth signals and risk indicators
 
 ### Recommended Actions
 7-10 specific, prioritized recommendations organized by:
-1. **Quick Wins** (implement this week)
-2. **Strategic Moves** (implement this month)
-3. **Long-term Opportunities** (plan for next quarter)
+1. **Quick Wins** (implement this week) — include web/SEO quick wins if GA4 data shows opportunities
+2. **Strategic Moves** (implement this month) — include content-to-web conversion strategies
+3. **Long-term Opportunities** (plan for next quarter) — include device optimization, landing page strategy
 
 ### Next-Period Focus
-Top 3 priorities with specific measurable goals for the next reporting period.
+Top 3 priorities with specific measurable goals for the next reporting period. Include at least one web performance goal if GA4 data is available.
