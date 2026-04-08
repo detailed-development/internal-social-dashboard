@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { Outlet } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
 
 // Auth is checked via the Express backend (/api/auth/check) which proxies
@@ -18,6 +18,7 @@ const WP_LOGIN    = 'https://neoncactusmedia.com/wp-login.php'
 // chain passes through a different origin (e.g. /app-gateway/ on the WP domain).
 const LOOP_KEY = 'ncm_auth_redirect_pending'
 const LOOP_TTL = 120_000 // 2 minutes — flag auto-expires after this
+const RECHECK_INTERVAL = 15 * 60_000 // re-verify session every 15 minutes
 
 function isLoopFlagSet() {
   try {
@@ -34,16 +35,14 @@ function clearLoopFlag() {
 }
 
 export default function AuthGate() {
-  const location = useLocation()
   const { theme } = useTheme()
   // 'checking' | 'ok' | 'forbidden' | 'login_failed' | 'endpoint_error'
   const [state, setState] = useState('checking')
   const abortRef = useRef(null)
 
-  useEffect(() => {
-    setState('checking')
+  const runAuthCheck = useCallback((showSpinner = true) => {
+    if (showSpinner) setState('checking')
 
-    // Abort any previous in-flight check
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -67,8 +66,6 @@ export default function AuthGate() {
             clearLoopFlag()
             setState('forbidden')
           } else if (res.status === 401) {
-            // If we just came back from WP login, retry a couple of times
-            // before giving up — cookies can sometimes take a moment.
             if (isLoopFlagSet() && retries < MAX_RETRIES) {
               retries++
               setTimeout(runCheck, RETRY_DELAY)
@@ -76,8 +73,6 @@ export default function AuthGate() {
             }
 
             if (isLoopFlagSet()) {
-              // We already redirected to WP login and came back — still 401.
-              // Break the loop instead of redirecting again.
               clearLoopFlag()
               setState('login_failed')
             } else {
@@ -87,23 +82,31 @@ export default function AuthGate() {
               )
             }
           } else {
-            // 404, 500, etc. — the endpoint itself has a problem.
             clearLoopFlag()
             setState('endpoint_error')
           }
         })
         .catch(err => {
           if (controller.signal.aborted) return
-          // Network error or CORS rejection — endpoint unreachable.
           clearLoopFlag()
           setState('endpoint_error')
         })
     }
 
     runCheck()
-
     return () => controller.abort()
-  }, [location.pathname])
+  }, [])
+
+  // Check auth once on mount, then silently re-verify every 15 minutes
+  useEffect(() => {
+    const cleanup = runAuthCheck(true)
+
+    const interval = setInterval(() => {
+      runAuthCheck(false) // silent — no "Checking access…" spinner
+    }, RECHECK_INTERVAL)
+
+    return () => { cleanup(); clearInterval(interval) }
+  }, [])
 
   function handleRetry() {
     clearLoopFlag()
