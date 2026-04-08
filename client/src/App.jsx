@@ -1,11 +1,23 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { ThemeProvider } from './ThemeContext'
+import { Suspense, lazy } from 'react'
+import { ThemeProvider, useTheme } from './ThemeContext'
 import AuthGate from './components/AuthGate'
 import Layout from './components/Layout'
 import Overview from './pages/Overview'
-import ClientDetail from './pages/ClientDetail'
-import Admin from './pages/Admin'
-import AITools from './pages/AITools'
+
+// Heavy pages loaded on demand — keeps initial bundle small
+const ClientDetail = lazy(() => import('./pages/ClientDetail'))
+const Admin = lazy(() => import('./pages/Admin'))
+const AITools = lazy(() => import('./pages/AITools'))
+
+function PageLoader() {
+  const { theme } = useTheme()
+  return (
+    <div className={`flex items-center justify-center h-64`}>
+      <span className={`text-sm ${theme.muted}`}>Loading…</span>
+    </div>
+  )
+}
 
 export default function App() {
   return (
@@ -15,9 +27,9 @@ export default function App() {
           <Route element={<AuthGate />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Overview />} />
-              <Route path="/clients/:slug" element={<ClientDetail />} />
-              <Route path="/ai-tools" element={<AITools />} />
-              <Route path="/admin" element={<Admin />} />
+              <Route path="/clients/:slug" element={<Suspense fallback={<PageLoader />}><ClientDetail /></Suspense>} />
+              <Route path="/ai-tools" element={<Suspense fallback={<PageLoader />}><AITools /></Suspense>} />
+              <Route path="/admin" element={<Suspense fallback={<PageLoader />}><Admin /></Suspense>} />
             </Route>
           </Route>
         </Routes>
