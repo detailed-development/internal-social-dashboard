@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { encrypt } from './encryption.js';
 
 const GRAPH = 'https://graph.facebook.com/v19.0';
 const ENV_PATH = path.resolve(process.cwd(), '.env');
@@ -9,7 +10,7 @@ export async function exchangeToken() {
   const { META_APP_ID, META_APP_SECRET, META_USER_TOKEN } = process.env;
 
   if (!META_APP_ID || !META_APP_SECRET || !META_USER_TOKEN) {
-    throw new Error('META_APP_ID, META_APP_SECRET, and META_USER_TOKEN must all be set in .env');
+    throw new Error('META_APP_ID, META_APP_SECRET, and META_USER_TOKEN must all be set in environment variables');
   }
 
   const url =
@@ -33,7 +34,7 @@ export async function exchangeTokenFrom(shortLivedToken) {
   const { META_APP_ID, META_APP_SECRET } = process.env;
 
   if (!META_APP_ID || !META_APP_SECRET) {
-    throw new Error('META_APP_ID and META_APP_SECRET must be set in .env');
+    throw new Error('META_APP_ID and META_APP_SECRET must be set in environment variables');
   }
 
   const url =
@@ -50,19 +51,33 @@ export async function exchangeTokenFrom(shortLivedToken) {
   return json.access_token;
 }
 
-// Write the new token to .env and update the running process.
+// Update the token in the running process and attempt to write it back to .env.
+// In a container environment there is no .env file — the file write is skipped
+// gracefully and a warning is logged. The returned token should be saved as the
+// META_USER_TOKEN environment variable in your container settings.
 export function persistToken(newToken) {
-  let envContent = fs.readFileSync(ENV_PATH, 'utf8');
-  if (/^META_USER_TOKEN=/m.test(envContent)) {
-    envContent = envContent.replace(/^META_USER_TOKEN=.*/m, `META_USER_TOKEN=${newToken}`);
-  } else {
-    envContent += `\nMETA_USER_TOKEN=${newToken}`;
-  }
-  fs.writeFileSync(ENV_PATH, envContent, 'utf8');
   process.env.META_USER_TOKEN = newToken;
+
+  try {
+    let envContent = fs.readFileSync(ENV_PATH, 'utf8');
+    if (/^META_USER_TOKEN=/m.test(envContent)) {
+      envContent = envContent.replace(/^META_USER_TOKEN=.*/m, `META_USER_TOKEN=${newToken}`);
+    } else {
+      envContent += `\nMETA_USER_TOKEN=${newToken}`;
+    }
+    fs.writeFileSync(ENV_PATH, envContent, 'utf8');
+  } catch {
+    console.warn(
+      '[meta-token-refresh] Could not write to .env (expected in container deployments).\n' +
+      '  Token is active for this session. Update META_USER_TOKEN in your container\n' +
+      '  environment settings to persist it across restarts.'
+    );
+  }
 }
 
 // Upsert every Facebook page + linked Instagram account using the given token.
+// Page-level access tokens are encrypted at rest using AES-256-GCM when
+// ENCRYPTION_KEY is set in the environment.
 export async function refreshAccounts(prisma, token) {
   const url = `${GRAPH}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,followers_count}&limit=50&access_token=${token}`;
   const res = await fetch(url);
@@ -75,15 +90,17 @@ export async function refreshAccounts(prisma, token) {
 
   for (const page of pages) {
     try {
+      const encryptedToken = encrypt(page.access_token);
+
       const fb = await prisma.socialAccount.upsert({
         where: { platform_platformUserId: { platform: 'FACEBOOK', platformUserId: page.id } },
-        update: { accessToken: page.access_token, tokenStatus: 'ACTIVE', displayName: page.name },
+        update: { accessToken: encryptedToken, tokenStatus: 'ACTIVE', displayName: page.name },
         create: {
           platform: 'FACEBOOK',
           platformUserId: page.id,
           handle: page.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
           displayName: page.name.trim(),
-          accessToken: page.access_token,
+          accessToken: encryptedToken,
           tokenStatus: 'ACTIVE',
           clientId: await resolveClientId(prisma, page.name),
         },
@@ -95,7 +112,7 @@ export async function refreshAccounts(prisma, token) {
         const igAccount = await prisma.socialAccount.upsert({
           where: { platform_platformUserId: { platform: 'INSTAGRAM', platformUserId: ig.id } },
           update: {
-            accessToken: page.access_token,
+            accessToken: encryptedToken,
             tokenStatus: 'ACTIVE',
             followerCount: ig.followers_count || 0,
             displayName: ig.name,
@@ -105,7 +122,7 @@ export async function refreshAccounts(prisma, token) {
             platformUserId: ig.id,
             handle: ig.username,
             displayName: ig.name,
-            accessToken: page.access_token,
+            accessToken: encryptedToken,
             tokenStatus: 'ACTIVE',
             followerCount: ig.followers_count || 0,
             clientId: await resolveClientId(prisma, page.name),
@@ -122,10 +139,13 @@ export async function refreshAccounts(prisma, token) {
 }
 
 // Full orchestration: exchange → persist → upsert accounts.
+// Returns the new token alongside the refresh results so callers can surface
+// it to the admin for updating container environment variables.
 export async function runFullRefresh(prisma) {
   const newToken = await exchangeToken();
   persistToken(newToken);
-  return refreshAccounts(prisma, newToken);
+  const result = await refreshAccounts(prisma, newToken);
+  return { ...result, newToken };
 }
 
 async function resolveClientId(prisma, pageName) {

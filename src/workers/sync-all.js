@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
+import { decrypt } from '../lib/encryption.js';
 
 process.on('uncaughtException', (err) => {
   console.error('[CRASH] uncaughtException:', err.message);
@@ -26,33 +27,40 @@ async function syncAllAccounts() {
     });
 
     for (const account of accounts) {
+      // Decrypt OAuth tokens before passing to platform functions.
+      // decrypt() is a no-op on plaintext tokens (backward-compatible).
+      const account_ = {
+        ...account,
+        accessToken:  decrypt(account.accessToken),
+        refreshToken: decrypt(account.refreshToken),
+      };
       try {
-        console.log(`  Syncing ${account.client.name} / ${account.platform} (@${account.handle})`);
-        switch (account.platform) {
+        console.log(`  Syncing ${account_.client.name} / ${account_.platform} (@${account_.handle})`);
+        switch (account_.platform) {
           case 'INSTAGRAM': {
             const { syncInstagram } = await import('../lib/platforms/instagram.js');
-            await syncInstagram(prisma, account);
+            await syncInstagram(prisma, account_);
             break;
           }
           case 'FACEBOOK': {
             const { syncFacebook } = await import('../lib/platforms/facebook.js');
-            await syncFacebook(prisma, account);
+            await syncFacebook(prisma, account_);
             break;
           }
           case 'YOUTUBE': {
             const { syncYouTube } = await import('../lib/platforms/youtube.js');
-            await syncYouTube(prisma, account);
+            await syncYouTube(prisma, account_);
             break;
           }
           default:
-            console.log(`    Skipping ${account.platform} (not yet implemented)`);
+            console.log(`    Skipping ${account_.platform} (not yet implemented)`);
         }
-        await prisma.socialAccount.update({ where: { id: account.id }, data: { lastSyncedAt: new Date() } });
+        await prisma.socialAccount.update({ where: { id: account_.id }, data: { lastSyncedAt: new Date() } });
       } catch (err) {
         const detail = err.response?.data?.error?.message || err.message;
-        console.error(`  ERROR syncing ${account.handle} [${account.platform}]: ${detail}`);
+        console.error(`  ERROR syncing ${account_.handle} [${account_.platform}]: ${detail}`);
         if (err.response?.data?.error?.code === 190 || detail?.includes('token')) {
-          await prisma.socialAccount.update({ where: { id: account.id }, data: { tokenStatus: 'EXPIRED' } });
+          await prisma.socialAccount.update({ where: { id: account_.id }, data: { tokenStatus: 'EXPIRED' } });
         }
       }
     }
@@ -71,9 +79,14 @@ async function syncAllAccounts() {
       include: { client: true },
     });
     for (const account of messagingAccounts) {
+      const account_ = {
+        ...account,
+        accessToken:  decrypt(account.accessToken),
+        refreshToken: decrypt(account.refreshToken),
+      };
       try {
-        console.log(`  Syncing messages for ${account.client.name} / ${account.platform} (@${account.handle})`);
-        await syncMessages(prisma, account);
+        console.log(`  Syncing messages for ${account_.client.name} / ${account_.platform} (@${account_.handle})`);
+        await syncMessages(prisma, account_);
       } catch (err) {
         const detail = err.response?.data?.error?.message || err.message;
         console.error(`  ERROR syncing messages for @${account.handle} [${account.platform}]: ${detail}`);

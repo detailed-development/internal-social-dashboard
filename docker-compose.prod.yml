@@ -6,6 +6,9 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - AUTH_CHECK_URL=${AUTH_CHECK_URL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - META_USER_TOKEN=${META_USER_TOKEN}
       - META_APP_ID=${META_APP_ID}

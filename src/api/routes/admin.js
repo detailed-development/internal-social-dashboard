@@ -9,8 +9,10 @@ const router = Router();
 router.get('/refresh-meta-tokens', async (req, res) => {
   const prisma = req.app.get('prisma');
   try {
-    const { updated, errors, total } = await runFullRefresh(prisma);
-    res.json({ tokenRefreshed: true, updated, errors, total });
+    const { updated, errors, total, newToken } = await runFullRefresh(prisma);
+    // newToken is returned so the admin can copy it into container environment
+    // settings (META_USER_TOKEN) to persist it across restarts.
+    res.json({ tokenRefreshed: true, newToken, updated, errors, total });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
