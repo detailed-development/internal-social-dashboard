@@ -4,8 +4,12 @@
  * db:hydrate — runs migrations + all seed scripts in the correct order.
  *
  * Usage:
- *   DATABASE_URL="..." node scripts/hydrate.js
- *   DATABASE_URL="..." META_USER_TOKEN="..." node scripts/hydrate.js   # includes Meta sync
+ *   DATABASE_URL="..." npm run db:hydrate
+ *   DATABASE_URL="..." META_USER_TOKEN="..." npm run db:hydrate
+ *
+ * If DIRECT_URL is not set, the script auto-derives a migration-safe URL
+ * from DATABASE_URL by switching to the session pooler (port 5432, no
+ * pgbouncer flag). This avoids needing the Supabase direct connection host.
  *
  * Steps:
  *   1. prisma migrate deploy   — apply schema
@@ -21,21 +25,38 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
-function run(label, cmd, args, opts = {}) {
+// ── Derive DIRECT_URL if not provided ──────────────────────────────────────
+// Supabase transaction pooler (port 6543, ?pgbouncer=true) doesn't support
+// migrations. The session pooler (same host, port 5432, no pgbouncer) does.
+if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    url.port = '5432';
+    url.searchParams.delete('pgbouncer');
+    process.env.DIRECT_URL = url.toString();
+    console.log(`ℹ  DIRECT_URL not set — using session pooler: ${url.host}:5432`);
+  } catch {
+    console.log('⚠  Could not derive DIRECT_URL from DATABASE_URL');
+  }
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL is required.\n');
+  console.error('Usage:');
+  console.error('  DATABASE_URL="postgresql://..." npm run db:hydrate\n');
+  process.exit(1);
+}
+
+function run(label, cmd, args) {
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`  ${label}`);
   console.log('═'.repeat(60));
   try {
-    execFileSync(cmd, args, { stdio: 'inherit', cwd: root, ...opts });
+    execFileSync(cmd, args, { stdio: 'inherit', cwd: root });
   } catch (err) {
-    if (opts.optional) {
-      console.log(`  ⏭  Skipped (${opts.reason || 'failed'})`);
-      return false;
-    }
     console.error(`\n  ✕  "${label}" failed (exit ${err.status})`);
     process.exit(err.status || 1);
   }
-  return true;
 }
 
 // 1. Migrations — use local prisma to avoid npx pulling a wrong major version
