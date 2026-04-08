@@ -21,9 +21,13 @@
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from 'dotenv';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
+
+// Load .env from project root
+config({ path: resolve(root, '.env') });
 
 // ── Derive DIRECT_URL if not provided ──────────────────────────────────────
 // Supabase transaction pooler (port 6543, ?pgbouncer=true) doesn't support
