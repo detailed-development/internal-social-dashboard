@@ -10,6 +10,7 @@
     "dev:client": "cd client && npm run dev",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "node prisma/seed.js",
+    "db:hydrate": "node scripts/hydrate.js",
     "db:studio": "npx prisma studio",
     "worker:sync": "node src/workers/sync-all.js",
     "test": "vitest run",
