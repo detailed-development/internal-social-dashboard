@@ -1,5 +1,16 @@
 import { createContext, useContext, useState } from 'react'
 
+export const SIDEBAR_COLORS = [
+  { id: 'default', label: 'Default', color: null },
+  { id: 'slate', label: 'Slate', color: '#0f172a' },
+  { id: 'navy', label: 'Navy', color: '#172554' },
+  { id: 'indigo', label: 'Indigo', color: '#1e1b4b' },
+  { id: 'purple', label: 'Purple', color: '#2e1065' },
+  { id: 'teal', label: 'Teal', color: '#042f2e' },
+  { id: 'wine', label: 'Wine', color: '#4c0519' },
+  { id: 'charcoal', label: 'Charcoal', color: '#18181b' },
+]
+
 export const THEMES = {
   default: {
     id: 'default',
@@ -312,15 +323,25 @@ export function ThemeProvider({ children }) {
     try { return localStorage.getItem('ncm_theme') || 'default' } catch { return 'default' }
   })
 
+  const [sidebarColorId, setSidebarColorIdState] = useState(() => {
+    try { return localStorage.getItem('ncm_sidebar_color') || 'default' } catch { return 'default' }
+  })
+
   function setTheme(key) {
     setThemeKey(key)
     try { localStorage.setItem('ncm_theme', key) } catch {}
   }
 
+  function setSidebarColor(id) {
+    setSidebarColorIdState(id)
+    try { localStorage.setItem('ncm_sidebar_color', id) } catch {}
+  }
+
   const theme = Object.hasOwn(THEMES, themeKey) ? THEMES[themeKey] : THEMES.default
+  const sidebarColor = SIDEBAR_COLORS.find(c => c.id === sidebarColorId)?.color || null
 
   return (
-    <ThemeContext.Provider value={{ theme, themeKey, setTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={{ theme, themeKey, setTheme, themes: THEMES, sidebarColor, sidebarColorId, setSidebarColor }}>
       {children}
     </ThemeContext.Provider>
   )
