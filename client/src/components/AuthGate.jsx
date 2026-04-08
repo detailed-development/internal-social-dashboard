@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext'
 
 // Called directly from the browser so the browser's own WP session cookies
 // are included automatically — no cross-domain cookie forwarding needed.
-const WP_AUTH_URL = 'http://neoncactusmedia.com/wp-json/ncm/v1/social-dashboard-access'
+const WP_AUTH_URL = 'https://neoncactusmedia.com/wp-json/ncm/v1/social-dashboard-access'
 const WP_LOGIN    = 'https://neoncactusmedia.com/wp-login.php'
 
 // sessionStorage key used to detect redirect loops.
