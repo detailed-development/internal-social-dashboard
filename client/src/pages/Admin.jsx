@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { refreshMetaTokens, triggerAutoRefresh, exchangeShortToken } from '../api'
-import { useTheme, THEMES } from '../ThemeContext'
+import { useTheme, THEMES, SIDEBAR_COLORS } from '../ThemeContext'
 
 function ResultList({ updated, errors, total, theme }) {
   return (
@@ -34,7 +34,7 @@ function ResultList({ updated, errors, total, theme }) {
 }
 
 export default function Admin() {
-  const { theme, themeKey, setTheme } = useTheme()
+  const { theme, themeKey, setTheme, sidebarColorId, setSidebarColor } = useTheme()
 
   // Auto-refresh state (uses stored .env credentials)
   const [autoLoading, setAutoLoading] = useState(false)
@@ -189,6 +189,51 @@ export default function Admin() {
                         : 'bg-indigo-600 text-white'
                   }`}>✓</span>
                 )}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ── Sidebar Color ── */}
+      <section className={`rounded-xl border p-6 mb-5 ${theme.card}`}>
+        <div className="flex items-start gap-3 mb-5">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${theme.accentIconBg}`}>
+            <svg className={`w-4 h-4 ${theme.accentIconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className={`font-semibold ${theme.heading}`}>Sidebar Color</h3>
+            <p className={`text-sm mt-0.5 ${theme.subtext}`}>
+              Choose a custom color for the sidebar. Select "Default" to use the theme's built-in color.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          {SIDEBAR_COLORS.map(sc => {
+            const isActive = sidebarColorId === sc.id
+            const bgColor = sc.color || '#111827' // gray-900 fallback for "default"
+            return (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => setSidebarColor(sc.id)}
+                className={`group flex flex-col items-center gap-1.5 transition-all`}
+                title={sc.label}
+              >
+                <div
+                  className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                    isActive
+                      ? 'border-indigo-500 ring-2 ring-indigo-500/30 scale-110'
+                      : 'border-gray-300 hover:border-gray-400 hover:scale-105'
+                  }`}
+                  style={{ backgroundColor: bgColor }}
+                />
+                <span className={`text-xs ${isActive ? theme.heading + ' font-semibold' : theme.muted}`}>
+                  {sc.label}
+                </span>
               </button>
             )
           })}
