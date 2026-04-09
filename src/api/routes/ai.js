@@ -11,9 +11,14 @@ const router = Router();
 const MODEL = 'gpt-4o-mini';
 
 const COST_ESTIMATES = {
-  'report-draft': { inputTokens: 2500, maxOutputTokens: 3072 },
-  'weekly-insights': { inputTokens: 1200, maxOutputTokens: 512 },
+  'report-draft':      { inputTokens: 2500, maxOutputTokens: 3072 },
+  'weekly-insights':   { inputTokens: 1200, maxOutputTokens: 512 },
+  'caption-generator': { inputTokens: 400,  maxOutputTokens: 1024 },
+  'hashtag-extractor': { inputTokens: 300,  maxOutputTokens: 512 },
+  'content-rewriter':  { inputTokens: 500,  maxOutputTokens: 1024 },
 };
+
+const CONTENT_FEATURES = new Set(['caption-generator', 'hashtag-extractor', 'content-rewriter']);
 
 const INPUT_COST_PER_M = 0.15;
 const OUTPUT_COST_PER_M = 0.60;
@@ -59,25 +64,30 @@ function handleError(res, err) {
 // ─── Generation Preflight Check ─────────────────────────────────────────────
 
 router.post('/check', async (req, res) => {
-  const { features, clientSlug, dateRangeStart, dateRangeEnd } = req.body;
+  const { features, clientSlug, dateRangeStart, dateRangeEnd, inputParams } = req.body;
 
   if (!Array.isArray(features) || features.length === 0) {
     return res.status(400).json({ error: 'features (array) is required', code: 'VALIDATION_ERROR' });
   }
 
-  if (!clientSlug) {
-    return res.status(400).json({ error: 'clientSlug is required', code: 'VALIDATION_ERROR' });
+  // clientSlug is required for analytics features but optional for content features
+  const hasAnalyticsFeature = features.some(f => !CONTENT_FEATURES.has(f));
+  if (hasAnalyticsFeature && !clientSlug) {
+    return res.status(400).json({ error: 'clientSlug is required for analytics features', code: 'VALIDATION_ERROR' });
   }
 
   try {
     const prisma = req.app.get('prisma');
-    const client = await prisma.client.findUnique({
-      where: { slug: clientSlug },
-      select: { id: true },
-    });
+    let client = null;
 
-    if (!client) {
-      return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
+    if (clientSlug) {
+      client = await prisma.client.findUnique({
+        where: { slug: clientSlug },
+        select: { id: true },
+      });
+      if (!client && hasAnalyticsFeature) {
+        return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
+      }
     }
 
     const now = new Date();
@@ -90,21 +100,36 @@ router.post('/check', async (req, res) => {
         continue;
       }
 
-      const defaultDays = feature === 'report-draft' ? 30 : 7;
-      const start = dateRangeStart || new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const end = dateRangeEnd || now.toISOString().split('T')[0];
       const { version } = loadTemplate(feature);
+      let cacheKey;
 
-      const inputHash = hashInput({ clientSlug, start, end });
-      const cacheKey = computeCacheKey({
-        feature,
-        clientId: client.id,
-        dateRangeStart: start,
-        dateRangeEnd: end,
-        inputHash,
-        promptVersion: version,
-        model: MODEL,
-      });
+      if (CONTENT_FEATURES.has(feature)) {
+        // Content tools: cache key from inputParams, matching content-ai.js logic
+        const params = inputParams?.[feature] || {};
+        const contentInputHash = hashInput(params);
+        cacheKey = computeCacheKey({
+          feature,
+          clientId: params.clientSlug || null,
+          inputHash: contentInputHash,
+          promptVersion: version,
+          model: MODEL,
+        });
+      } else {
+        // Analytics tools: cache key from clientSlug + date range
+        const defaultDays = feature === 'report-draft' ? 30 : 7;
+        const start = dateRangeStart || new Date(now.getTime() - defaultDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const end = dateRangeEnd || now.toISOString().split('T')[0];
+        const analyticsInputHash = hashInput({ clientSlug, start, end });
+        cacheKey = computeCacheKey({
+          feature,
+          clientId: client.id,
+          dateRangeStart: start,
+          dateRangeEnd: end,
+          inputHash: analyticsInputHash,
+          promptVersion: version,
+          model: MODEL,
+        });
+      }
 
       const cached = await getCachedResponse(prisma, cacheKey);
 

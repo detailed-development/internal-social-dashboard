@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { extractHashtags } from '../../api'
+import { extractHashtags, checkAiGeneration } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
+import ConfirmGenerateModal from './ConfirmGenerateModal'
 
 export default function HashtagExtractor() {
   const { theme } = useTheme()
@@ -12,6 +13,34 @@ export default function HashtagExtractor() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState(null)
+  const [confirmChecking, setConfirmChecking] = useState(false)
+  const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
+
+  async function openConfirm(forceRefresh = false) {
+    if (text.length < 10) return
+    setPendingForceRefresh(forceRefresh)
+    setShowConfirm(true)
+    setConfirmData(null)
+    setConfirmChecking(true)
+    try {
+      const data = await checkAiGeneration({
+        features: ['hashtag-extractor'],
+        inputParams: { 'hashtag-extractor': { text, platform, maxTags } },
+      })
+      setConfirmData(data)
+    } catch {
+      setConfirmData(null)
+    } finally {
+      setConfirmChecking(false)
+    }
+  }
+
+  function handleConfirm() {
+    setShowConfirm(false)
+    handleExtract(pendingForceRefresh)
+  }
 
   async function handleExtract(forceRefresh = false) {
     if (text.length < 10) return
@@ -70,7 +99,7 @@ export default function HashtagExtractor() {
           </div>
         </div>
 
-        <button onClick={() => handleExtract(false)} disabled={loading || text.length < 10} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
+        <button onClick={() => openConfirm(false)} disabled={loading || text.length < 10} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
           {loading ? 'Extracting...' : 'Extract Hashtags'}
         </button>
       </div>
@@ -84,7 +113,10 @@ export default function HashtagExtractor() {
                 <span className={`px-2 py-0.5 rounded-full ${result.cached ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                   {result.cached ? 'Cached' : 'Fresh'}
                 </span>
-                <button onClick={() => handleExtract(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                {result.usage?.totalTokens > 0 && (
+                  <span className={theme.muted}>{result.usage.totalTokens} tokens</span>
+                )}
+                <button onClick={() => openConfirm(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
                   Regenerate
                 </button>
               </div>
@@ -133,6 +165,14 @@ export default function HashtagExtractor() {
           </div>
         )}
       </AILoadingState>
+      <ConfirmGenerateModal
+        open={showConfirm}
+        checking={confirmChecking}
+        data={confirmData}
+        isRegenerate={pendingForceRefresh}
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   )
 }

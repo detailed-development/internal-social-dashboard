@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { generateCaption } from '../../api'
+import { generateCaption, checkAiGeneration } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
+import ConfirmGenerateModal from './ConfirmGenerateModal'
 
 const PLATFORMS = ['Instagram', 'Facebook', 'Twitter', 'TikTok', 'YouTube', 'LinkedIn']
 const TONES = ['casual', 'professional', 'playful', 'bold', 'inspirational', 'educational']
@@ -18,6 +19,34 @@ export default function CaptionGenerator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState(null)
+  const [confirmChecking, setConfirmChecking] = useState(false)
+  const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
+
+  async function openConfirm(forceRefresh = false) {
+    if (!topic.trim()) return
+    setPendingForceRefresh(forceRefresh)
+    setShowConfirm(true)
+    setConfirmData(null)
+    setConfirmChecking(true)
+    try {
+      const data = await checkAiGeneration({
+        features: ['caption-generator'],
+        inputParams: { 'caption-generator': { platform, topic, tone, length, hashtags } },
+      })
+      setConfirmData(data)
+    } catch {
+      setConfirmData(null)
+    } finally {
+      setConfirmChecking(false)
+    }
+  }
+
+  function handleConfirm() {
+    setShowConfirm(false)
+    handleGenerate(pendingForceRefresh)
+  }
 
   async function handleGenerate(forceRefresh = false) {
     if (!topic.trim()) return
@@ -108,7 +137,7 @@ export default function CaptionGenerator() {
           </div>
         </div>
 
-        <button onClick={() => handleGenerate(false)} disabled={loading || !topic.trim()} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
+        <button onClick={() => openConfirm(false)} disabled={loading || !topic.trim()} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
           {loading ? 'Generating...' : 'Generate Captions'}
         </button>
       </div>
@@ -122,7 +151,10 @@ export default function CaptionGenerator() {
                 <span className={`px-2 py-0.5 rounded-full ${result.cached ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                   {result.cached ? 'Cached' : 'Fresh'}
                 </span>
-                <button onClick={() => handleGenerate(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                {result.usage?.totalTokens > 0 && (
+                  <span className={theme.muted}>{result.usage.totalTokens} tokens</span>
+                )}
+                <button onClick={() => openConfirm(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
                   Regenerate
                 </button>
               </div>
@@ -143,6 +175,14 @@ export default function CaptionGenerator() {
           </div>
         )}
       </AILoadingState>
+      <ConfirmGenerateModal
+        open={showConfirm}
+        checking={confirmChecking}
+        data={confirmData}
+        isRegenerate={pendingForceRefresh}
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   )
 }

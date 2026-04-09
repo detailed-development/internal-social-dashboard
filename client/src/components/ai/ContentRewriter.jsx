@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { rewriteContent } from '../../api'
+import { rewriteContent, checkAiGeneration } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
+import ConfirmGenerateModal from './ConfirmGenerateModal'
 
 const TONES = [
   'professional', 'casual', 'concise', 'persuasive', 'polished',
@@ -18,6 +19,41 @@ export default function ContentRewriter() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState(null)
+  const [confirmChecking, setConfirmChecking] = useState(false)
+  const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
+
+  async function openConfirm(forceRefresh = false) {
+    if (text.length < 10) return
+    setPendingForceRefresh(forceRefresh)
+    setShowConfirm(true)
+    setConfirmData(null)
+    setConfirmChecking(true)
+    try {
+      const data = await checkAiGeneration({
+        features: ['content-rewriter'],
+        inputParams: {
+          'content-rewriter': {
+            text,
+            targetTone,
+            platform,
+            maxLength: maxLength ? parseInt(maxLength) : '',
+          },
+        },
+      })
+      setConfirmData(data)
+    } catch {
+      setConfirmData(null)
+    } finally {
+      setConfirmChecking(false)
+    }
+  }
+
+  function handleConfirm() {
+    setShowConfirm(false)
+    handleRewrite(pendingForceRefresh)
+  }
 
   async function handleRewrite(forceRefresh = false) {
     if (text.length < 10) return
@@ -87,7 +123,7 @@ export default function ContentRewriter() {
           </div>
         </div>
 
-        <button onClick={() => handleRewrite(false)} disabled={loading || text.length < 10} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
+        <button onClick={() => openConfirm(false)} disabled={loading || text.length < 10} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
           {loading ? 'Rewriting...' : 'Rewrite'}
         </button>
       </div>
@@ -101,10 +137,13 @@ export default function ContentRewriter() {
                 <span className={`px-2 py-0.5 rounded-full ${result.cached ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                   {result.cached ? 'Cached' : 'Fresh'}
                 </span>
+                {result.usage?.totalTokens > 0 && (
+                  <span className={theme.muted}>{result.usage.totalTokens} tokens</span>
+                )}
                 <button onClick={copyResult} className="text-indigo-600 hover:text-indigo-800 font-medium">
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
-                <button onClick={() => handleRewrite(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                <button onClick={() => openConfirm(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
                   Regenerate
                 </button>
               </div>
@@ -115,6 +154,14 @@ export default function ContentRewriter() {
           </div>
         )}
       </AILoadingState>
+      <ConfirmGenerateModal
+        open={showConfirm}
+        checking={confirmChecking}
+        data={confirmData}
+        isRegenerate={pendingForceRefresh}
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   )
 }
