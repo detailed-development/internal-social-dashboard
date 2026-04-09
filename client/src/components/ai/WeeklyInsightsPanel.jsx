@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { generateWeeklyInsights, generateReportDraft } from '../../api'
+import { generateWeeklyInsights, generateReportDraft, checkAiGeneration } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
+import ConfirmGenerateModal from './ConfirmGenerateModal'
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -39,6 +40,38 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
   const [error, setError] = useState(null)
   const [activeView, setActiveView] = useState('insights') // 'insights' | 'report'
   const [expandedSections, setExpandedSections] = useState({})
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState(null)
+  const [confirmChecking, setConfirmChecking] = useState(false)
+  const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
+
+  async function openConfirm(forceRefresh = false) {
+    if (!clientSlug) return
+
+    setPendingForceRefresh(forceRefresh)
+    setShowConfirm(true)
+    setConfirmData(null)
+    setConfirmChecking(true)
+
+    try {
+      const data = await checkAiGeneration({
+        features: ['weekly-insights', 'report-draft'],
+        clientSlug,
+        dateRangeStart: dateStart,
+        dateRangeEnd: dateEnd,
+      })
+      setConfirmData(data)
+    } catch {
+      setConfirmData(null)
+    } finally {
+      setConfirmChecking(false)
+    }
+  }
+
+  function handleConfirm() {
+    setShowConfirm(false)
+    handleGenerate(pendingForceRefresh)
+  }
 
   async function handleGenerate(forceRefresh = false) {
     setLoading(true)
@@ -81,11 +114,11 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
             <label className={`block text-xs font-medium mb-1 ${theme.muted}`}>To</label>
             <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`} />
           </div>
-          <button onClick={() => handleGenerate(false)} disabled={loading} className={`px-4 py-1.5 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
+          <button onClick={() => openConfirm(false)} disabled={loading} className={`px-4 py-1.5 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
             {loading ? 'Generating...' : 'Generate Insights'}
           </button>
           {report && (
-            <button onClick={() => handleGenerate(true)} disabled={loading} className={`px-3 py-1.5 text-sm rounded-lg ${theme.btnOutline || 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            <button onClick={() => openConfirm(true)} disabled={loading} className={`px-3 py-1.5 text-sm rounded-lg ${theme.btnOutline || 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
               Regenerate
             </button>
           )}
@@ -322,6 +355,14 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
           </div>
         )}
       </AILoadingState>
+      <ConfirmGenerateModal
+        open={showConfirm}
+        checking={confirmChecking}
+        data={confirmData}
+        isRegenerate={pendingForceRefresh}
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   )
 }

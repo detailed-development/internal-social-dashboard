@@ -24,3 +24,4 @@ export const generateCaption = (params) => api.post('/ai/caption-generator', par
 export const extractHashtags = (params) => api.post('/ai/hashtag-extractor', params).then(r => r.data)
 export const generateReportDraft = (params) => api.post('/ai/report-draft', params).then(r => r.data)
 export const rewriteContent = (params) => api.post('/ai/content-rewriter', params).then(r => r.data)
+export const checkAiGeneration = (params) => api.post('/ai/check', params).then(r => r.data)

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { generateReportDraft, getClients } from '../../api'
+import { generateReportDraft, getClients, checkAiGeneration } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
+import ConfirmGenerateModal from './ConfirmGenerateModal'
 
 function formatDate(d) {
   return new Date(d).toISOString().split('T')[0]
@@ -35,6 +36,10 @@ export default function ReportDraftGenerator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState(null)
+  const [confirmChecking, setConfirmChecking] = useState(false)
+  const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
 
   useEffect(() => {
     getClients().then(data => {
@@ -42,6 +47,34 @@ export default function ReportDraftGenerator() {
       if (data.length > 0 && !clientSlug) setClientSlug(data[0].slug)
     }).catch(() => {})
   }, [])
+
+  async function openConfirm(forceRefresh = false) {
+    if (!clientSlug) return
+
+    setPendingForceRefresh(forceRefresh)
+    setShowConfirm(true)
+    setConfirmData(null)
+    setConfirmChecking(true)
+
+    try {
+      const data = await checkAiGeneration({
+        features: ['report-draft'],
+        clientSlug,
+        dateRangeStart: dateStart,
+        dateRangeEnd: dateEnd,
+      })
+      setConfirmData(data)
+    } catch {
+      setConfirmData(null)
+    } finally {
+      setConfirmChecking(false)
+    }
+  }
+
+  function handleConfirm() {
+    setShowConfirm(false)
+    handleGenerate(pendingForceRefresh)
+  }
 
   async function handleGenerate(forceRefresh = false) {
     if (!clientSlug) return
@@ -88,7 +121,7 @@ export default function ReportDraftGenerator() {
             <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`} />
           </div>
         </div>
-        <button onClick={() => handleGenerate(false)} disabled={loading || !clientSlug} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
+        <button onClick={() => openConfirm(false)} disabled={loading || !clientSlug} className={`px-5 py-2 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
           {loading ? 'Generating Report...' : 'Generate Report Draft'}
         </button>
       </div>
@@ -108,7 +141,7 @@ export default function ReportDraftGenerator() {
                 <button onClick={copyReport} className="text-indigo-600 hover:text-indigo-800 font-medium">
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
-                <button onClick={() => handleGenerate(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                <button onClick={() => openConfirm(true)} className="text-indigo-600 hover:text-indigo-800 font-medium">
                   Regenerate
                 </button>
               </div>
@@ -119,6 +152,14 @@ export default function ReportDraftGenerator() {
           </div>
         )}
       </AILoadingState>
+      <ConfirmGenerateModal
+        open={showConfirm}
+        checking={confirmChecking}
+        data={confirmData}
+        isRegenerate={pendingForceRefresh}
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   )
 }
