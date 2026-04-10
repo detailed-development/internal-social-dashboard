@@ -134,11 +134,17 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
   const { theme } = useTheme()
   const c = theme.chart
   const now = new Date()
-  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000)
 
   const [intervalMode, setIntervalMode] = useState('weekly') // 'weekly' | 'monthly' | 'custom'
-  const [dateStart, setDateStart] = useState(formatDate(weekAgo))
-  const [dateEnd, setDateEnd] = useState(formatDate(now))
+
+  // Initialise to current Sunday–Saturday week
+  const initSunday = new Date(now)
+  initSunday.setDate(now.getDate() - now.getDay())
+  const initSaturday = new Date(initSunday)
+  initSaturday.setDate(initSunday.getDate() + 6)
+
+  const [dateStart, setDateStart] = useState(formatDate(initSunday))
+  const [dateEnd, setDateEnd] = useState(formatDate(initSaturday))
   const [cachedIntervals, setCachedIntervals] = useState([])
   const [insights, setInsights] = useState(null)
   const [report, setReport] = useState(null)
@@ -154,11 +160,19 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
   function applyPreset(mode) {
     const n = new Date()
     if (mode === 'weekly') {
-      setDateStart(formatDate(new Date(n - 7 * 24 * 60 * 60 * 1000)))
-      setDateEnd(formatDate(n))
+      // Sunday–Saturday of the current calendar week
+      const sunday = new Date(n)
+      sunday.setDate(n.getDate() - n.getDay())
+      const saturday = new Date(sunday)
+      saturday.setDate(sunday.getDate() + 6)
+      setDateStart(formatDate(sunday))
+      setDateEnd(formatDate(saturday))
     } else if (mode === 'monthly') {
-      setDateStart(formatDate(new Date(n - 30 * 24 * 60 * 60 * 1000)))
-      setDateEnd(formatDate(n))
+      // 1st through last day of the current calendar month
+      const firstDay = new Date(n.getFullYear(), n.getMonth(), 1)
+      const lastDay  = new Date(n.getFullYear(), n.getMonth() + 1, 0)
+      setDateStart(formatDate(firstDay))
+      setDateEnd(formatDate(lastDay))
     }
     // 'custom': leave dates as-is
     setIntervalMode(mode)
