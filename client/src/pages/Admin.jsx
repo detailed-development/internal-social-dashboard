@@ -57,6 +57,9 @@ export default function Admin() {
   const [exchangeResult, setExchangeResult] = useState(null)
   const [exchangeError, setExchangeError] = useState('')
 
+  // Top-level settings tab
+  const [settingsTab, setSettingsTab] = useState('general') // 'general' | 'integrations' | 'content-tools'
+
   // Content Tools state
   const [contentTab, setContentTab] = useState('captions')
   const [writingAssistOpen, setWritingAssistOpen] = useState(false)
@@ -109,10 +112,36 @@ export default function Admin() {
     }
   }
 
+  const SETTINGS_TABS = [
+    { key: 'general',       label: 'General' },
+    { key: 'integrations',  label: 'Integrations' },
+    { key: 'content-tools', label: 'Content Tools' },
+  ]
+
   return (
     <div className="p-4 sm:p-8 max-w-4xl">
-      <h2 className={`text-2xl font-bold mb-1 ${theme.heading}`}>Admin Settings</h2>
-      <p className={`text-sm mb-8 ${theme.subtext}`}>Internal configuration for the NCM dashboard.</p>
+      <h2 className={`text-2xl font-bold mb-1 ${theme.heading}`}>Settings</h2>
+      <p className={`text-sm mb-6 ${theme.subtext}`}>Internal configuration for the NCM dashboard.</p>
+
+      {/* ── Subtab bar ── */}
+      <div className={`flex gap-1 mb-8 p-1 rounded-lg w-fit ${theme.id === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+        {SETTINGS_TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setSettingsTab(t.key)}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+              settingsTab === t.key
+                ? theme.id === 'dark' ? 'bg-gray-500 text-white' : 'bg-white text-gray-900 shadow-sm'
+                : theme.id === 'dark' ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── General tab ── */}
+      {settingsTab === 'general' && <>
 
       {/* ── Dashboard Style ── */}
       <section className={`rounded-xl border p-6 mb-5 ${theme.card}`}>
@@ -247,6 +276,11 @@ export default function Admin() {
           })}
         </div>
       </section>
+
+      </> /* end General tab */}
+
+      {/* ── Integrations tab ── */}
+      {settingsTab === 'integrations' && <>
 
       {/* ── Auto-refresh ── */}
       <section className={`rounded-xl border p-6 mb-5 ${theme.card}`}>
@@ -398,9 +432,11 @@ export default function Admin() {
         {manualResult && <ResultList {...manualResult} theme={theme} />}
       </section>
 
-      {/* ── Content Tools ── */}
-      <div className="mt-10">
-        <h2 className={`text-lg font-semibold mb-1 ${theme.heading}`}>Content Tools</h2>
+      </> /* end Integrations tab */}
+
+      {/* ── Content Tools tab ── */}
+      {settingsTab === 'content-tools' && <>
+      <div className="mt-0">
         <p className={`text-sm mb-5 ${theme.subtext}`}>AI-assisted copy generation utilities. These are supplementary tools — not core dashboard features.</p>
 
         {/* Writing Assist accordion */}
@@ -475,6 +511,7 @@ export default function Admin() {
           <ReportDraftGenerator />
         </section>
       </div>
+      </> /* end Content Tools tab */}
     </div>
   )
 }
