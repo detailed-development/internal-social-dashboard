@@ -161,17 +161,17 @@ router.get('/cached-intervals', async (req, res) => {
   const prisma = req.app.get('prisma');
   const now = new Date();
 
-  let clientId = null;
-  if (clientSlug) {
-    const client = await prisma.client.findUnique({
-      where: { slug: clientSlug },
-      select: { id: true },
-    });
-    if (!client) return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
-    clientId = client.id;
-  }
-
   try {
+    let clientId = null;
+    if (clientSlug) {
+      const client = await prisma.client.findUnique({
+        where: { slug: clientSlug },
+        select: { id: true },
+      });
+      if (!client) return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
+      clientId = client.id;
+    }
+
     const rows = await prisma.aiGeneration.findMany({
       where: {
         feature: { in: featureList },
@@ -201,17 +201,17 @@ router.delete('/cached-intervals', async (req, res) => {
 
   const prisma = req.app.get('prisma');
 
-  let clientId = null;
-  if (clientSlug) {
-    const client = await prisma.client.findUnique({
-      where: { slug: clientSlug },
-      select: { id: true },
-    });
-    if (!client) return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
-    clientId = client.id;
-  }
-
   try {
+    let clientId = null;
+    if (clientSlug) {
+      const client = await prisma.client.findUnique({
+        where: { slug: clientSlug },
+        select: { id: true },
+      });
+      if (!client) return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
+      clientId = client.id;
+    }
+
     const where = { feature: { in: featureList }, clientId };
     if (dateRangeStart) where.dateRangeStart = new Date(dateRangeStart);
     if (dateRangeEnd)   where.dateRangeEnd   = new Date(dateRangeEnd);

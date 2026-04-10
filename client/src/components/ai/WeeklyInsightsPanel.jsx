@@ -26,7 +26,16 @@ function fmtDate(dateStr) {
 
 function fmtDisplayDate(dateStr) {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  let d
+  // YYYY-MM-DD strings are parsed as UTC midnight by the Date constructor,
+  // which shifts the displayed day back by one in negative-offset timezones.
+  // Parse them as local dates instead; full ISO datetime strings are fine as-is.
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split('-').map(Number)
+    d = new Date(year, month - 1, day)
+  } else {
+    d = new Date(dateStr)
+  }
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
