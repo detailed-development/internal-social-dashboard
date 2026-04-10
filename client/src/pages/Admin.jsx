@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { refreshMetaTokens, triggerAutoRefresh, exchangeShortToken } from '../api'
 import { useTheme, THEMES, SIDEBAR_COLORS } from '../ThemeContext'
+import CaptionGenerator from '../components/ai/CaptionGenerator'
+import ContentRewriter from '../components/ai/ContentRewriter'
+import HashtagExtractor from '../components/ai/HashtagExtractor'
+import ReportDraftGenerator from '../components/ai/ReportDraftGenerator'
 
 function ResultList({ updated, errors, total, theme }) {
   return (
@@ -53,6 +57,10 @@ export default function Admin() {
   const [exchangeResult, setExchangeResult] = useState(null)
   const [exchangeError, setExchangeError] = useState('')
 
+  // Content Tools state
+  const [contentTab, setContentTab] = useState('captions')
+  const [writingAssistOpen, setWritingAssistOpen] = useState(false)
+
   async function handleAutoRefresh() {
     setAutoLoading(true)
     setAutoResult(null)
@@ -102,7 +110,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="p-4 sm:p-8 max-w-2xl">
+    <div className="p-4 sm:p-8 max-w-4xl">
       <h2 className={`text-2xl font-bold mb-1 ${theme.heading}`}>Admin Settings</h2>
       <p className={`text-sm mb-8 ${theme.subtext}`}>Internal configuration for the NCM dashboard.</p>
 
@@ -389,6 +397,84 @@ export default function Admin() {
 
         {manualResult && <ResultList {...manualResult} theme={theme} />}
       </section>
+
+      {/* ── Content Tools ── */}
+      <div className="mt-10">
+        <h2 className={`text-lg font-semibold mb-1 ${theme.heading}`}>Content Tools</h2>
+        <p className={`text-sm mb-5 ${theme.subtext}`}>AI-assisted copy generation utilities. These are supplementary tools — not core dashboard features.</p>
+
+        {/* Writing Assist accordion */}
+        <section className={`rounded-xl border mb-4 ${theme.card}`}>
+          <button
+            type="button"
+            onClick={() => setWritingAssistOpen(o => !o)}
+            className={`w-full flex items-center justify-between px-6 py-4 text-left`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme.accentIconBg}`}>
+                <svg className={`w-4 h-4 ${theme.accentIconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className={`font-semibold ${theme.heading}`}>Writing Assist</h3>
+                <p className={`text-sm mt-0.5 ${theme.subtext}`}>Caption Generator · Rewriter · Hashtag Generator</p>
+              </div>
+            </div>
+            <svg
+              className={`w-4 h-4 flex-shrink-0 transition-transform ${writingAssistOpen ? 'rotate-180' : ''} ${theme.muted}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          {writingAssistOpen && (
+            <div className="px-6 pb-6">
+              {/* Tab switcher */}
+              <div className={`flex gap-1 mb-5 p-1 rounded-lg ${theme.id === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                {[['captions', 'Caption Generator'], ['rewriter', 'Rewriter'], ['hashtags', 'Hashtag Generator']].map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setContentTab(key)}
+                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+                      contentTab === key
+                        ? theme.id === 'dark' ? 'bg-gray-500 text-white' : 'bg-white text-gray-900 shadow-sm'
+                        : theme.id === 'dark' ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {contentTab === 'captions'  && <CaptionGenerator />}
+              {contentTab === 'rewriter'  && <ContentRewriter />}
+              {contentTab === 'hashtags'  && <HashtagExtractor />}
+            </div>
+          )}
+        </section>
+
+        {/* Report Draft — sibling item under Content Tools */}
+        <section className={`rounded-xl border p-6 ${theme.card}`}>
+          <div className="flex items-start gap-3 mb-5">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${theme.accentIconBg}`}>
+              <svg className={`w-4 h-4 ${theme.accentIconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+            <div>
+              <h3 className={`font-semibold ${theme.heading}`}>Report Draft</h3>
+              <p className={`text-sm mt-0.5 ${theme.subtext}`}>Generate a client-ready performance report for a given date range.</p>
+            </div>
+          </div>
+          <ReportDraftGenerator />
+        </section>
+      </div>
     </div>
   )
 }

@@ -25,3 +25,4 @@ export const extractHashtags = (params) => api.post('/ai/hashtag-extractor', par
 export const generateReportDraft = (params) => api.post('/ai/report-draft', params).then(r => r.data)
 export const rewriteContent = (params) => api.post('/ai/content-rewriter', params).then(r => r.data)
 export const checkAiGeneration = (params) => api.post('/ai/check', params).then(r => r.data)
+export const getCachedIntervals = (params) => api.get('/ai/cached-intervals', { params }).then(r => r.data)

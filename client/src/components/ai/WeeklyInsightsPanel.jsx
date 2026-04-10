@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { generateWeeklyInsights, generateReportDraft, checkAiGeneration } from '../../api'
+import { useState, useEffect } from 'react'
+import { generateWeeklyInsights, generateReportDraft, checkAiGeneration, getCachedIntervals } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
 import ConfirmGenerateModal from './ConfirmGenerateModal'
@@ -24,16 +24,122 @@ function fmtDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+function fmtDisplayDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 const PIE_COLORS = ['#6366f1', '#f472b6', '#34d399', '#fbbf24', '#60a5fa', '#a78bfa']
 
+/* ── Cached Intervals Panel ─────────────────────────────────────────────────── */
+function CachedIntervalsPanel({ intervals, currentStart, currentEnd, onUse, theme }) {
+  // Group by (dateRangeStart, dateRangeEnd) so we can show per-window coverage
+  const grouped = {}
+  for (const row of intervals) {
+    const start = row.dateRangeStart ? formatDate(row.dateRangeStart) : null
+    const end   = row.dateRangeEnd   ? formatDate(row.dateRangeEnd)   : null
+    if (!start || !end) continue
+    const key = `${start}||${end}`
+    if (!grouped[key]) grouped[key] = { start, end, features: {}, createdAt: row.createdAt, expiresAt: row.expiresAt }
+    grouped[key].features[row.feature] = true
+    // Track the earliest createdAt and latest expiresAt for the window
+    if (row.createdAt > grouped[key].createdAt) grouped[key].createdAt = row.createdAt
+    if (row.expiresAt && (!grouped[key].expiresAt || row.expiresAt > grouped[key].expiresAt)) {
+      grouped[key].expiresAt = row.expiresAt
+    }
+  }
+
+  const entries = Object.values(grouped).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  return (
+    <div>
+      <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${theme.muted}`}>Cached Intervals</p>
+      {entries.length === 0 ? (
+        <p className={`text-xs ${theme.muted}`}>No cached intervals yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((entry, i) => {
+            const isActive = entry.start === currentStart && entry.end === currentEnd
+            return (
+              <div
+                key={i}
+                className={`rounded-lg border p-3 text-xs transition-colors ${
+                  isActive
+                    ? theme.id === 'dark'
+                      ? 'border-indigo-500 bg-indigo-900/40'
+                      : 'border-indigo-400 bg-indigo-50'
+                    : theme.id === 'dark'
+                      ? 'border-gray-700 bg-gray-800/50'
+                      : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                <p className={`font-semibold mb-1 ${theme.heading}`}>
+                  {fmtDisplayDate(entry.start)} – {fmtDisplayDate(entry.end)}
+                </p>
+                <div className="flex gap-1.5 flex-wrap mb-1.5">
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                    entry.features['weekly-insights']
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    {entry.features['weekly-insights'] ? '✓' : '✗'} Insights
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                    entry.features['report-draft']
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    {entry.features['report-draft'] ? '✓' : '✗'} Report
+                  </span>
+                </div>
+                <p className={`${theme.muted} mb-0.5`}>
+                  Generated {fmtDisplayDate(entry.createdAt)}
+                </p>
+                {entry.expiresAt && (
+                  <p className={theme.muted}>
+                    Expires {fmtDisplayDate(entry.expiresAt)}
+                  </p>
+                )}
+                {!isActive && (
+                  <button
+                    onClick={() => onUse(entry.start, entry.end)}
+                    className={`mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                      theme.id === 'dark'
+                        ? 'bg-indigo-700 text-white hover:bg-indigo-600'
+                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                    }`}
+                  >
+                    Use these dates
+                  </button>
+                )}
+                {isActive && (
+                  <p className={`mt-1.5 text-[10px] font-semibold ${
+                    theme.id === 'dark' ? 'text-indigo-400' : 'text-indigo-600'
+                  }`}>
+                    Currently selected
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Main Component ──────────────────────────────────────────────────────────── */
 export default function WeeklyInsightsPanel({ clientSlug }) {
   const { theme } = useTheme()
   const c = theme.chart
   const now = new Date()
   const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000)
 
+  const [intervalMode, setIntervalMode] = useState('weekly') // 'weekly' | 'monthly' | 'custom'
   const [dateStart, setDateStart] = useState(formatDate(weekAgo))
   const [dateEnd, setDateEnd] = useState(formatDate(now))
+  const [cachedIntervals, setCachedIntervals] = useState([])
   const [insights, setInsights] = useState(null)
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -44,6 +150,29 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
   const [confirmData, setConfirmData] = useState(null)
   const [confirmChecking, setConfirmChecking] = useState(false)
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
+
+  function applyPreset(mode) {
+    const n = new Date()
+    if (mode === 'weekly') {
+      setDateStart(formatDate(new Date(n - 7 * 24 * 60 * 60 * 1000)))
+      setDateEnd(formatDate(n))
+    } else if (mode === 'monthly') {
+      setDateStart(formatDate(new Date(n - 30 * 24 * 60 * 60 * 1000)))
+      setDateEnd(formatDate(n))
+    }
+    // 'custom': leave dates as-is
+    setIntervalMode(mode)
+  }
+
+  async function fetchCachedIntervals() {
+    if (!clientSlug) return
+    try {
+      const rows = await getCachedIntervals({ clientSlug, features: 'weekly-insights,report-draft' })
+      setCachedIntervals(rows)
+    } catch { /* non-critical */ }
+  }
+
+  useEffect(() => { fetchCachedIntervals() }, [clientSlug])
 
   async function openConfirm(forceRefresh = false) {
     if (!clientSlug) return
@@ -83,6 +212,7 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
       ])
       setInsights(insightsData)
       setReport(reportData)
+      await fetchCachedIntervals()
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to generate insights.')
     } finally {
@@ -105,23 +235,83 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
     <div className="space-y-4">
       {/* Controls */}
       <div className={`rounded-xl p-4 ${theme.card}`}>
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className={`block text-xs font-medium mb-1 ${theme.muted}`}>From</label>
-            <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`} />
+        <div className="flex flex-col md:flex-row gap-4">
+
+          {/* Left: interval presets + date pickers + generate button */}
+          <div className="flex-1 space-y-3">
+            {/* Preset buttons */}
+            <div>
+              <label className={`block text-xs font-medium mb-1.5 ${theme.muted}`}>Date Range</label>
+              <div className="flex gap-1">
+                {[['weekly', 'Weekly'], ['monthly', 'Monthly'], ['custom', 'Custom']].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => applyPreset(mode)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      intervalMode === mode
+                        ? theme.id === 'dark'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-indigo-600 text-white'
+                        : theme.id === 'dark'
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom date pickers — only shown in custom mode */}
+            {intervalMode === 'custom' && (
+              <div className="flex flex-wrap gap-3">
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${theme.muted}`}>From</label>
+                  <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${theme.muted}`}>To</label>
+                  <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`} />
+                </div>
+              </div>
+            )}
+
+            {/* Date display for presets */}
+            {intervalMode !== 'custom' && (
+              <p className={`text-xs ${theme.muted}`}>
+                {fmtDisplayDate(dateStart)} – {fmtDisplayDate(dateEnd)}
+              </p>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => openConfirm(false)} disabled={loading} className={`px-4 py-1.5 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
+                {loading ? 'Generating...' : 'Generate Insights'}
+              </button>
+              {report && (
+                <button onClick={() => openConfirm(true)} disabled={loading} className={`px-3 py-1.5 text-sm rounded-lg ${theme.btnOutline || 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                  Regenerate
+                </button>
+              )}
+            </div>
           </div>
-          <div>
-            <label className={`block text-xs font-medium mb-1 ${theme.muted}`}>To</label>
-            <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`} />
+
+          {/* Right: Cached Intervals panel */}
+          <div className={`md:w-60 shrink-0 ${theme.id === 'dark' ? 'border-gray-700' : 'border-gray-200'} md:border-l md:pl-4`}>
+            <CachedIntervalsPanel
+              intervals={cachedIntervals}
+              currentStart={dateStart}
+              currentEnd={dateEnd}
+              onUse={(start, end) => {
+                setIntervalMode('custom')
+                setDateStart(start)
+                setDateEnd(end)
+              }}
+              theme={theme}
+            />
           </div>
-          <button onClick={() => openConfirm(false)} disabled={loading} className={`px-4 py-1.5 text-sm font-medium rounded-lg ${theme.btnPrimary}`}>
-            {loading ? 'Generating...' : 'Generate Insights'}
-          </button>
-          {report && (
-            <button onClick={() => openConfirm(true)} disabled={loading} className={`px-3 py-1.5 text-sm rounded-lg ${theme.btnOutline || 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-              Regenerate
-            </button>
-          )}
         </div>
       </div>
 
