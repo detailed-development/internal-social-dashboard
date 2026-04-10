@@ -167,18 +167,6 @@ export default function Layout() {
             <OverviewIcon />
             {!isMinimized && <span>Overview</span>}
           </NavLink>
-          <NavLink
-            to="/ai-tools"
-            className={({ isActive }) =>
-              `flex items-center ${isMinimized ? 'justify-center' : 'gap-2'} px-3 py-2 rounded-lg text-sm transition-colors ${
-                isActive ? theme.navItemActive : theme.navItemInactive
-              }`
-            }
-            title="AI Tools"
-          >
-            <AIToolsIcon />
-            {!isMinimized && <span>AI Tools</span>}
-          </NavLink>
         </div>
 
         {/* Search + view toggle (hidden when minimized) */}

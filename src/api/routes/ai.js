@@ -150,6 +150,49 @@ router.post('/check', async (req, res) => {
   }
 });
 
+// ─── Cached Intervals ────────────────────────────────────────────────────────
+
+router.get('/cached-intervals', async (req, res) => {
+  const { clientSlug, features } = req.query;
+  const featureList = features
+    ? features.split(',').filter(f => COST_ESTIMATES[f])
+    : ['weekly-insights', 'report-draft'];
+
+  const prisma = req.app.get('prisma');
+  const now = new Date();
+
+  let clientId = null;
+  if (clientSlug) {
+    const client = await prisma.client.findUnique({
+      where: { slug: clientSlug },
+      select: { id: true },
+    });
+    if (!client) return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
+    clientId = client.id;
+  }
+
+  try {
+    const rows = await prisma.aiGeneration.findMany({
+      where: {
+        feature: { in: featureList },
+        clientId,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      select: {
+        feature: true,
+        dateRangeStart: true,
+        dateRangeEnd: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(rows);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
 // ─── Weekly Insights ─────────────────────────────────────────────────────────
 
 router.post('/weekly-insights', async (req, res) => {
