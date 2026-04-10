@@ -193,6 +193,36 @@ router.get('/cached-intervals', async (req, res) => {
   }
 });
 
+router.delete('/cached-intervals', async (req, res) => {
+  const { clientSlug, dateRangeStart, dateRangeEnd, features } = req.body;
+  const featureList = features
+    ? (Array.isArray(features) ? features : features.split(',')).filter(f => COST_ESTIMATES[f])
+    : ['weekly-insights', 'report-draft'];
+
+  const prisma = req.app.get('prisma');
+
+  let clientId = null;
+  if (clientSlug) {
+    const client = await prisma.client.findUnique({
+      where: { slug: clientSlug },
+      select: { id: true },
+    });
+    if (!client) return res.status(404).json({ error: 'Client not found', code: 'CLIENT_NOT_FOUND' });
+    clientId = client.id;
+  }
+
+  try {
+    const where = { feature: { in: featureList }, clientId };
+    if (dateRangeStart) where.dateRangeStart = new Date(dateRangeStart);
+    if (dateRangeEnd)   where.dateRangeEnd   = new Date(dateRangeEnd);
+
+    const { count } = await prisma.aiGeneration.deleteMany({ where });
+    res.json({ deleted: count });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
 // ─── Weekly Insights ─────────────────────────────────────────────────────────
 
 router.post('/weekly-insights', async (req, res) => {

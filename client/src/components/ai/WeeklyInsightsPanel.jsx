@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { generateWeeklyInsights, generateReportDraft, checkAiGeneration, getCachedIntervals } from '../../api'
+import { generateWeeklyInsights, generateReportDraft, checkAiGeneration, getCachedIntervals, deleteCachedInterval } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
 import ConfirmGenerateModal from './ConfirmGenerateModal'
@@ -33,7 +33,10 @@ function fmtDisplayDate(dateStr) {
 const PIE_COLORS = ['#6366f1', '#f472b6', '#34d399', '#fbbf24', '#60a5fa', '#a78bfa']
 
 /* ── Cached Intervals Panel ─────────────────────────────────────────────────── */
-function CachedIntervalsPanel({ intervals, currentStart, currentEnd, onUse, theme }) {
+function CachedIntervalsPanel({ intervals, currentStart, currentEnd, onUse, onDelete, theme }) {
+  const [confirmKey, setConfirmKey] = useState(null) // key of entry awaiting delete confirm
+  const [deleting, setDeleting] = useState(false)
+
   // Group by (dateRangeStart, dateRangeEnd) so we can show per-window coverage
   const grouped = {}
   for (const row of intervals) {
@@ -43,7 +46,6 @@ function CachedIntervalsPanel({ intervals, currentStart, currentEnd, onUse, them
     const key = `${start}||${end}`
     if (!grouped[key]) grouped[key] = { start, end, features: {}, createdAt: row.createdAt, expiresAt: row.expiresAt }
     grouped[key].features[row.feature] = true
-    // Track the earliest createdAt and latest expiresAt for the window
     if (row.createdAt > grouped[key].createdAt) grouped[key].createdAt = row.createdAt
     if (row.expiresAt && (!grouped[key].expiresAt || row.expiresAt > grouped[key].expiresAt)) {
       grouped[key].expiresAt = row.expiresAt
@@ -51,6 +53,16 @@ function CachedIntervalsPanel({ intervals, currentStart, currentEnd, onUse, them
   }
 
   const entries = Object.values(grouped).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  async function handleDelete(entry) {
+    setDeleting(true)
+    try {
+      await onDelete(entry.start, entry.end)
+    } finally {
+      setDeleting(false)
+      setConfirmKey(null)
+    }
+  }
 
   return (
     <div>
@@ -60,65 +72,120 @@ function CachedIntervalsPanel({ intervals, currentStart, currentEnd, onUse, them
       ) : (
         <div className="space-y-2">
           {entries.map((entry, i) => {
+            const key = `${entry.start}||${entry.end}`
             const isActive = entry.start === currentStart && entry.end === currentEnd
+            const isPendingDelete = confirmKey === key
+
             return (
               <div
                 key={i}
                 className={`rounded-lg border p-3 text-xs transition-colors ${
-                  isActive
+                  isPendingDelete
                     ? theme.id === 'dark'
-                      ? 'border-indigo-500 bg-indigo-900/40'
-                      : 'border-indigo-400 bg-indigo-50'
-                    : theme.id === 'dark'
-                      ? 'border-gray-700 bg-gray-800/50'
-                      : 'border-gray-200 bg-gray-50'
+                      ? 'border-red-700 bg-red-900/30'
+                      : 'border-red-300 bg-red-50'
+                    : isActive
+                      ? theme.id === 'dark'
+                        ? 'border-indigo-500 bg-indigo-900/40'
+                        : 'border-indigo-400 bg-indigo-50'
+                      : theme.id === 'dark'
+                        ? 'border-gray-700 bg-gray-800/50'
+                        : 'border-gray-200 bg-gray-50'
                 }`}
               >
-                <p className={`font-semibold mb-1 ${theme.heading}`}>
-                  {fmtDisplayDate(entry.start)} – {fmtDisplayDate(entry.end)}
-                </p>
-                <div className="flex gap-1.5 flex-wrap mb-1.5">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                    entry.features['weekly-insights']
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {entry.features['weekly-insights'] ? '✓' : '✗'} Insights
-                  </span>
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                    entry.features['report-draft']
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {entry.features['report-draft'] ? '✓' : '✗'} Report
-                  </span>
+                <div className="flex items-start justify-between gap-1 mb-1">
+                  <p className={`font-semibold ${theme.heading}`}>
+                    {fmtDisplayDate(entry.start)} – {fmtDisplayDate(entry.end)}
+                  </p>
+                  {!isPendingDelete && (
+                    <button
+                      onClick={() => setConfirmKey(key)}
+                      title="Remove from cache"
+                      className={`flex-shrink-0 rounded p-0.5 transition-colors ${
+                        theme.id === 'dark'
+                          ? 'text-gray-500 hover:text-red-400 hover:bg-red-900/40'
+                          : 'text-gray-300 hover:text-red-500 hover:bg-red-50'
+                      }`}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                        <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+                      </svg>
+                    </button>
+                  )}
                 </div>
-                <p className={`${theme.muted} mb-0.5`}>
-                  Generated {fmtDisplayDate(entry.createdAt)}
-                </p>
-                {entry.expiresAt && (
-                  <p className={theme.muted}>
-                    Expires {fmtDisplayDate(entry.expiresAt)}
-                  </p>
-                )}
-                {!isActive && (
-                  <button
-                    onClick={() => onUse(entry.start, entry.end)}
-                    className={`mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
-                      theme.id === 'dark'
-                        ? 'bg-indigo-700 text-white hover:bg-indigo-600'
-                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                    }`}
-                  >
-                    Use these dates
-                  </button>
-                )}
-                {isActive && (
-                  <p className={`mt-1.5 text-[10px] font-semibold ${
-                    theme.id === 'dark' ? 'text-indigo-400' : 'text-indigo-600'
-                  }`}>
-                    Currently selected
-                  </p>
+
+                {isPendingDelete ? (
+                  <div className="space-y-1.5">
+                    <p className={`text-[10px] ${theme.id === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
+                      Remove this cached interval?
+                    </p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => handleDelete(entry)}
+                        disabled={deleting}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                          theme.id === 'dark'
+                            ? 'bg-red-700 text-white hover:bg-red-600 disabled:opacity-50'
+                            : 'bg-red-500 text-white hover:bg-red-600 disabled:opacity-50'
+                        }`}
+                      >
+                        {deleting ? 'Removing…' : 'Remove'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmKey(null)}
+                        disabled={deleting}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                          theme.id === 'dark'
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        }`}
+                      >
+                        Keep
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-1.5 flex-wrap mb-1.5">
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                        entry.features['weekly-insights']
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {entry.features['weekly-insights'] ? '✓' : '✗'} Insights
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                        entry.features['report-draft']
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {entry.features['report-draft'] ? '✓' : '✗'} Report
+                      </span>
+                    </div>
+                    <p className={`${theme.muted} mb-0.5`}>Generated {fmtDisplayDate(entry.createdAt)}</p>
+                    {entry.expiresAt && (
+                      <p className={theme.muted}>Expires {fmtDisplayDate(entry.expiresAt)}</p>
+                    )}
+                    {!isActive && (
+                      <button
+                        onClick={() => onUse(entry.start, entry.end)}
+                        className={`mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                          theme.id === 'dark'
+                            ? 'bg-indigo-700 text-white hover:bg-indigo-600'
+                            : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                        }`}
+                      >
+                        Use these dates
+                      </button>
+                    )}
+                    {isActive && (
+                      <p className={`mt-1.5 text-[10px] font-semibold ${
+                        theme.id === 'dark' ? 'text-indigo-400' : 'text-indigo-600'
+                      }`}>
+                        Currently selected
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )
@@ -184,6 +251,16 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
       const rows = await getCachedIntervals({ clientSlug, features: 'weekly-insights,report-draft' })
       setCachedIntervals(rows)
     } catch { /* non-critical */ }
+  }
+
+  async function handleDeleteInterval(start, end) {
+    await deleteCachedInterval({
+      clientSlug,
+      dateRangeStart: start,
+      dateRangeEnd: end,
+      features: ['weekly-insights', 'report-draft'],
+    })
+    await fetchCachedIntervals()
   }
 
   useEffect(() => { fetchCachedIntervals() }, [clientSlug])
@@ -323,6 +400,7 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
                 setDateStart(start)
                 setDateEnd(end)
               }}
+              onDelete={handleDeleteInterval}
               theme={theme}
             />
           </div>
