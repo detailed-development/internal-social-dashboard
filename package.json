@@ -13,6 +13,9 @@
     "db:hydrate": "node scripts/hydrate.js",
     "db:studio": "npx prisma studio",
     "worker:sync": "node src/workers/sync-all.js",
+    "sync:nightly": "node scripts/nightly-sync.js",
+    "reporting:backfill": "node scripts/backfill-reporting-read-model.js",
+    "reporting:refresh": "node scripts/refresh-reporting-window.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

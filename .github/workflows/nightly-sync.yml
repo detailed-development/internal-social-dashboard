@@ -1,0 +1,83 @@
+name: Nightly Sync
+
+# Authoritative daily runner for the sync pipeline. Runs
+# `npm run sync:nightly`, which invokes runFullSync() from src/workers/sync-core.js.
+# The in-process node-cron in src/workers/sync-all.js continues to run
+# intra-day refreshes for deployments that also run the long-lived worker,
+# but this workflow is what we trust to produce a fresh dataset once per day.
+
+on:
+  schedule:
+    # 05:00 UTC daily (~midnight Pacific / 1 AM Eastern). Adjust later if
+    # Meta/GA4 rate limits suggest a different window.
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: nightly-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # Make secrets available to `if:` guards below.
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply pending Prisma migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Write GCP service account (optional)
+        if: env.GOOGLE_SERVICE_ACCOUNT_JSON != ''
+        run: printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > google-service-account.json
+
+      - name: Run nightly sync
+        id: sync
+        run: npm run sync:nightly 2>&1 | tee sync-${{ github.run_id }}.log
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_USER_TOKEN: ${{ secrets.META_USER_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          # Reporting read-model refresh runs at the end of each sync. Flag
+          # default is false; flip to 'true' after Phase 2 ships and
+          # backfill has been run at least once.
+          USE_REPORTING_READ_MODEL: ${{ vars.USE_REPORTING_READ_MODEL || 'false' }}
+          REPORTING_REFRESH_WINDOW_DAYS: ${{ vars.REPORTING_REFRESH_WINDOW_DAYS || '35' }}
+          NODE_ENV: production
+
+      - name: Cleanup GCP service account
+        if: always() && env.GOOGLE_SERVICE_ACCOUNT_JSON != ''
+        run: rm -f google-service-account.json
+
+      - name: Upload sync log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-log-${{ github.run_id }}
+          path: sync-${{ github.run_id }}.log
+          if-no-files-found: warn
+          retention-days: 14
