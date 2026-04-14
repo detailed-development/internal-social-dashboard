@@ -62,6 +62,23 @@ export async function runFullSync({
 
   logger.log(`[${startedAt.toISOString()}] Starting sync cycle (mode=${mode})...`);
 
+  // ─── Meta token refresh (preventive) ──────────────────────────────────────
+  // Exchange the current long-lived token for a fresh one BEFORE social sync.
+  // This keeps the 60-day clock from expiring. If the token is already dead,
+  // this will fail gracefully and social sync will fail too — but GA4 and
+  // transcription still proceed. The admin will need to re-auth via OAuth.
+  try {
+    const { runFullRefresh } = await import('../lib/meta-token-refresh.js');
+    const refresh = await runFullRefresh(prisma);
+    logger.log(`  Meta token refreshed. ${refresh.updated?.length || 0} accounts updated.`);
+    summary.metaTokenRefreshed = true;
+  } catch (err) {
+    const detail = err?.message || String(err);
+    logger.error(`  Meta token refresh failed (social sync will likely fail): ${detail}`);
+    summary.metaTokenRefreshed = false;
+    addError('meta-token-refresh', {}, err);
+  }
+
   // ─── Social account sync ──────────────────────────────────────────────────
   try {
     const accounts = await prisma.socialAccount.findMany({
