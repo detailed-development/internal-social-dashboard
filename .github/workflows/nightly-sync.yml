@@ -46,6 +46,7 @@ jobs:
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
       - name: Write GCP service account (optional)
         if: env.GOOGLE_SERVICE_ACCOUNT_JSON != ''
@@ -56,6 +57,7 @@ jobs:
         run: npm run sync:nightly 2>&1 | tee sync-${{ github.run_id }}.log
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
           META_APP_ID: ${{ secrets.META_APP_ID }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
           META_USER_TOKEN: ${{ secrets.META_USER_TOKEN }}
