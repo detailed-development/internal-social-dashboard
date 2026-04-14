@@ -8,6 +8,10 @@ export const getClient     = (slug) => api.get(`/clients/${slug}`).then(r => r.d
 export const updateClient  = (slug, data) => api.patch(`/clients/${slug}`, data).then(r => r.data)
 export const getBuzzwords  = (slug) => api.get(`/analytics/client/${slug}/buzzwords`).then(r => r.data)
 export const getWebAnalytics = (slug) => api.get(`/analytics/client/${slug}/web`).then(r => r.data)
+// Canonical non-AI analytics endpoint (Layer B). Returns chartData + summary
+// + freshness + ruleInsights for a client + date range.
+export const getClientOverview = (slug, { start, end } = {}) =>
+  api.get(`/analytics/clients/${slug}/overview`, { params: { start, end } }).then(r => r.data)
 export const getGa4Properties = () => api.get('/ga4-properties').then(r => r.data)
 export const addSocialAccount = (slug, platform, handle) => api.post(`/clients/${slug}/add-social`, { platform, handle }).then(r => r.data)
 export const refreshMetaTokens = (token) => api.post('/admin/refresh-meta-tokens', { token }).then(r => r.data)

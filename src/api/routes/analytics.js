@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import { buildClientOverview } from '../../lib/analytics/client-overview.js';
+import { serializeOverviewResponse } from '../../lib/analytics/serializers/overview-response.js';
+
 const router = Router();
 
 router.get('/overview', async (req, res) => {
@@ -113,6 +116,25 @@ router.get('/client/:slug/web', async (req, res) => {
       pages: pages.map(p => ({ path: p.medium, sessions: p.sessions, users: p.users, pageviews: p.pageviews })),
     });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Non-AI client overview (Layer B) ────────────────────────────────────
+// Canonical analytics endpoint for the dashboard. Serves the deterministic
+// payload from buildClientOverview() — no AI calls, no OpenAI tokens.
+// Consumers: the client detail page (frontend default) and any integrations
+// that want raw charts + KPIs.
+router.get('/clients/:slug/overview', async (req, res) => {
+  const prisma = req.app.get('prisma');
+  const { slug } = req.params;
+  const { start, end } = req.query;
+  try {
+    const overview = await buildClientOverview(prisma, { clientSlug: slug, start, end });
+    if (!overview) return res.status(404).json({ error: 'Client not found' });
+    res.json(serializeOverviewResponse(overview));
+  } catch (err) {
+    req.log?.error?.(err) || console.error('[analytics overview]', err);
     res.status(500).json({ error: err.message });
   }
 });

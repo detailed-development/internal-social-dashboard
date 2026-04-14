@@ -33,6 +33,16 @@ model Client {
   socialAccounts SocialAccount[]
   webAnalytics   WebAnalytic[]
 
+  // Reporting read-model children
+  platformDailyMetrics ClientPlatformDailyMetric[]
+  postPerformance      ClientPostPerformance[]
+  webDailyMetrics      ClientWebDailyMetric[]
+  trafficSourceDaily   ClientTrafficSourceDaily[]
+  deviceDaily          ClientDeviceDaily[]
+  pageDaily            ClientPageDaily[]
+  buzzwordDaily        ClientBuzzwordDaily[]
+  reportInputSnapshots ClientReportInputSnapshot[]
+
   @@map("clients")
 }
 
@@ -61,21 +71,21 @@ enum MediaType {
 }
 
 model SocialAccount {
-  id              String      @id @default(uuid())
-  clientId        String      @map("client_id")
-  platform        Platform
-  platformUserId  String      @map("platform_user_id")
-  handle          String
-  displayName     String?     @map("display_name")
-  accessToken     String?     @map("access_token")
-  refreshToken    String?     @map("refresh_token")
-  tokenStatus     TokenStatus @default(PENDING) @map("token_status")
-  tokenExpiresAt  DateTime?   @map("token_expires_at")
-  lastSyncedAt    DateTime?   @map("last_synced_at")
-  followerCount   Int?        @map("follower_count")
-  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  posts           Post[]
-  conversations   Conversation[]
+  id             String         @id @default(uuid())
+  clientId       String         @map("client_id")
+  platform       Platform
+  platformUserId String         @map("platform_user_id")
+  handle         String
+  displayName    String?        @map("display_name")
+  accessToken    String?        @map("access_token")
+  refreshToken   String?        @map("refresh_token")
+  tokenStatus    TokenStatus    @default(PENDING) @map("token_status")
+  tokenExpiresAt DateTime?      @map("token_expires_at")
+  lastSyncedAt   DateTime?      @map("last_synced_at")
+  followerCount  Int?           @map("follower_count")
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  posts          Post[]
+  conversations  Conversation[]
 
   @@unique([platform, platformUserId])
   @@index([clientId])
@@ -83,17 +93,17 @@ model SocialAccount {
 }
 
 model Post {
-  id              String        @id @default(uuid())
-  socialAccountId String        @map("social_account_id")
-  platformPostId  String        @map("platform_post_id")
-  mediaType       MediaType     @map("media_type")
+  id              String         @id @default(uuid())
+  socialAccountId String         @map("social_account_id")
+  platformPostId  String         @map("platform_post_id")
+  mediaType       MediaType      @map("media_type")
   caption         String?
   permalink       String?
-  mediaUrl        String?       @map("media_url")
-  thumbnailUrl    String?       @map("thumbnail_url")
-  publishedAt     DateTime      @map("published_at")
-  fetchedAt       DateTime      @default(now()) @map("fetched_at")
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  mediaUrl        String?        @map("media_url")
+  thumbnailUrl    String?        @map("thumbnail_url")
+  publishedAt     DateTime       @map("published_at")
+  fetchedAt       DateTime       @default(now()) @map("fetched_at")
+  socialAccount   SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   metrics         PostMetric[]
   comments        Comment[]
   transcription   Transcription?
@@ -122,14 +132,14 @@ model PostMetric {
 }
 
 model Comment {
-  id                String    @id @default(uuid())
-  postId            String    @map("post_id")
-  platformCommentId String    @map("platform_comment_id")
-  authorName        String?   @map("author_name")
+  id                String     @id @default(uuid())
+  postId            String     @map("post_id")
+  platformCommentId String     @map("platform_comment_id")
+  authorName        String?    @map("author_name")
   body              String
-  sentimentScore    Float?    @map("sentiment_score")
-  postedAt          DateTime  @map("posted_at")
-  post              Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sentimentScore    Float?     @map("sentiment_score")
+  postedAt          DateTime   @map("posted_at")
+  post              Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
   buzzwords         Buzzword[]
 
   @@unique([postId, platformCommentId])
@@ -138,32 +148,32 @@ model Comment {
 }
 
 model Transcription {
-  id              String    @id @default(uuid())
-  postId          String    @unique @map("post_id")
-  transcriptText  String    @map("transcript_text")
-  language        String    @default("en")
+  id              String     @id @default(uuid())
+  postId          String     @unique @map("post_id")
+  transcriptText  String     @map("transcript_text")
+  language        String     @default("en")
   confidence      Float?
-  durationSeconds Int?      @map("duration_seconds")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  durationSeconds Int?       @map("duration_seconds")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  post            Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
   buzzwords       Buzzword[]
 
   @@map("transcriptions")
 }
 
 model WebAnalytic {
-  id                   String   @id @default(uuid())
-  clientId             String   @map("client_id")
-  date                 DateTime @map("date") @db.Date
-  sessions             Int      @default(0)
-  users                Int      @default(0)
-  newUsers             Int      @default(0) @map("new_users")
-  pageviews            Int      @default(0)
-  bounceRate           Float?   @map("bounce_rate")
-  avgSessionDuration   Float?   @map("avg_session_duration")
-  source               String?
-  medium               String?
-  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(uuid())
+  clientId           String   @map("client_id")
+  date               DateTime @map("date") @db.Date
+  sessions           Int      @default(0)
+  users              Int      @default(0)
+  newUsers           Int      @default(0) @map("new_users")
+  pageviews          Int      @default(0)
+  bounceRate         Float?   @map("bounce_rate")
+  avgSessionDuration Float?   @map("avg_session_duration")
+  source             String?
+  medium             String?
+  client             Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, date, source, medium])
   @@index([clientId, date(sort: Desc)])
@@ -244,4 +254,188 @@ model AiGeneration {
   @@index([createdAt])
   @@index([expiresAt])
   @@map("ai_generations")
+}
+
+// ─── Reporting read-model ──────────────────────────────────────────────────
+// Precomputed daily aggregates feeding Layer B (deterministic analytics).
+// Populated by src/lib/reporting/*-rollup.js after each successful sync and
+// by scripts/backfill-reporting-read-model.js for historical backfills.
+// These tables are optional: when USE_REPORTING_READ_MODEL is false, Layer B
+// falls back to raw-table aggregation. Cascade deletes from Client keep them
+// consistent.
+
+/// One row per (client, socialAccount, date, platform). Sums the latest-metric
+/// values across posts published on that date. Feeds platformTotals and
+/// dailyEngagement chart series.
+model ClientPlatformDailyMetric {
+  id              String   @id @default(uuid())
+  clientId        String   @map("client_id")
+  socialAccountId String?  @map("social_account_id")
+  date            DateTime @db.Date
+  platform        Platform
+  handle          String?
+  followerCount   Int      @default(0) @map("follower_count")
+  postsCount      Int      @default(0) @map("posts_count")
+  likes           Int      @default(0)
+  commentsCount   Int      @default(0) @map("comments_count")
+  shares          Int      @default(0)
+  saves           Int      @default(0)
+  reach           Int      @default(0)
+  impressions     Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, platform, socialAccountId])
+  @@index([clientId, date])
+  @@index([clientId, platform, date])
+  @@map("client_platform_daily_metrics")
+}
+
+/// One row per post, denormalized for reporting. Feeds top-post queries and
+/// post-type breakdowns. Engagement is precomputed as likes + comments +
+/// shares + saves to match current ranking semantics exactly.
+model ClientPostPerformance {
+  id              String    @id @default(uuid())
+  clientId        String    @map("client_id")
+  socialAccountId String?   @map("social_account_id")
+  postId          String    @unique @map("post_id")
+  date            DateTime  @db.Date
+  platform        Platform
+  mediaType       MediaType @map("media_type")
+  captionPreview  String?   @map("caption_preview") @db.VarChar(160)
+  likes           Int       @default(0)
+  commentsCount   Int       @default(0) @map("comments_count")
+  shares          Int       @default(0)
+  saves           Int       @default(0)
+  reach           Int       @default(0)
+  impressions     Int       @default(0)
+  engagement      Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, date])
+  @@index([clientId, engagement(sort: Desc), date])
+  @@index([clientId, platform, date])
+  @@index([clientId, mediaType, date])
+  @@map("client_post_performance")
+}
+
+/// Daily overview totals from WebAnalytic rows where source='all' AND
+/// medium='all'. Feeds dailyTraffic and web KPI tiles.
+model ClientWebDailyMetric {
+  id                 String   @id @default(uuid())
+  clientId           String   @map("client_id")
+  date               DateTime @db.Date
+  sessions           Int      @default(0)
+  users              Int      @default(0)
+  newUsers           Int      @default(0) @map("new_users")
+  pageviews          Int      @default(0)
+  bounceRateAvg      Decimal? @map("bounce_rate_avg") @db.Decimal(6, 2)
+  avgSessionDuration Decimal? @map("avg_session_duration") @db.Decimal(10, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  client             Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date])
+  @@index([clientId, date])
+  @@map("client_web_daily_metrics")
+}
+
+/// Source/medium breakdown by day. Populated from WebAnalytic rows where
+/// source NOT IN ('all','_device','_page').
+model ClientTrafficSourceDaily {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  date      DateTime @db.Date
+  source    String
+  medium    String
+  sessions  Int      @default(0)
+  users     Int      @default(0)
+  pageviews Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, source, medium])
+  @@index([clientId, date])
+  @@index([clientId, source, medium, date])
+  @@map("client_traffic_source_daily")
+}
+
+/// Device breakdown by day. Populated from WebAnalytic rows where
+/// source='_device' (medium holds the device name).
+model ClientDeviceDaily {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  date      DateTime @db.Date
+  device    String
+  sessions  Int      @default(0)
+  users     Int      @default(0)
+  pageviews Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, device])
+  @@index([clientId, date])
+  @@map("client_device_daily")
+}
+
+/// Top-page breakdown by day. Populated from WebAnalytic rows where
+/// source='_page' (medium holds the page path).
+model ClientPageDaily {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  date      DateTime @db.Date
+  path      String
+  sessions  Int      @default(0)
+  users     Int      @default(0)
+  pageviews Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, path])
+  @@index([clientId, date])
+  @@map("client_page_daily")
+}
+
+/// Date-scoped buzzword aggregates (fixes the current client-only aggregation
+/// path in gatherClientAnalytics).
+model ClientBuzzwordDaily {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  date      DateTime @db.Date
+  word      String
+  frequency Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date, word])
+  @@index([clientId, date])
+  @@index([clientId, word, date])
+  @@map("client_buzzword_daily")
+}
+
+/// Optional observability: stores the prompt-input JSON used for a given
+/// (client, feature, dateRange, inputVersion) so we can diff regenerated
+/// prompts over time.
+model ClientReportInputSnapshot {
+  id             String   @id @default(uuid())
+  clientId       String   @map("client_id")
+  feature        String
+  dateRangeStart DateTime @map("date_range_start") @db.Date
+  dateRangeEnd   DateTime @map("date_range_end") @db.Date
+  inputVersion   String   @map("input_version")
+  payloadJson    Json     @map("payload_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, feature, dateRangeStart, dateRangeEnd, inputVersion])
+  @@index([clientId, feature, dateRangeStart, dateRangeEnd])
+  @@map("client_report_input_snapshots")
 }

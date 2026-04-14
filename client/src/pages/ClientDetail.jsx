@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import {
   getClient, getBuzzwords, getWebAnalytics, updateClient,
   getGa4Properties, addSocialAccount, getMessages, lookupSocialHandle,
+  getClientOverview,
 } from '../api'
 import StatCard from '../components/StatCard'
 import PostCard from '../components/PostCard'
@@ -11,6 +12,8 @@ import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
 import MessagesSection from '../components/MessagesSection'
 import WeeklyInsightsPanel from '../components/ai/WeeklyInsightsPanel'
+import RuleInsightsPanel from '../components/analytics/RuleInsightsPanel'
+import FreshnessBadges from '../components/analytics/FreshnessBadges'
 import { useTheme } from '../ThemeContext'
 
 function fmt(n) {
@@ -24,6 +27,7 @@ export default function ClientDetail() {
   const { slug } = useParams()
   const { theme } = useTheme()
   const [client, setClient] = useState(null)
+  const [overview, setOverview] = useState(null)
   const [buzzwords, setBuzzwords] = useState([])
   const [webData, setWebData] = useState(null)
   const [messages, setMessages] = useState([])
@@ -64,6 +68,7 @@ export default function ClientDetail() {
 
   useEffect(() => {
     setClient(null)
+    setOverview(null)
     setWebData(null)
     setMessages([])
     setShowSettings(false)
@@ -74,6 +79,7 @@ export default function ClientDetail() {
 
     // Fire all independent API calls in parallel
     const clientPromise = getClient(slug)
+    const overviewPromise = getClientOverview(slug).then(setOverview).catch(() => {})
     const buzzwordsPromise = getBuzzwords(slug).then(setBuzzwords).catch(() => {})
     const webPromise = getWebAnalytics(slug).then(setWebData).catch(() => {})
 
@@ -226,13 +232,15 @@ export default function ClientDetail() {
     .flatMap(a => a.posts.map(p => ({ ...p, platform: a.platform, accountHandle: a.handle })))
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
 
-  const totalLikes     = allPosts.reduce((s, p) => s + (p.metrics?.[0]?.likes         || 0), 0)
-  const totalComments  = allPosts.reduce((s, p) => s + (p.metrics?.[0]?.commentsCount || 0), 0)
-  const totalReach     = allPosts.reduce((s, p) => s + (p.metrics?.[0]?.reach         || 0), 0)
-  const totalShares    = allPosts.reduce((s, p) => s + (p.metrics?.[0]?.shares        || 0), 0)
-  const totalSaves     = allPosts.reduce((s, p) => s + (p.metrics?.[0]?.saves         || 0), 0)
-  const totalFollowers = client.socialAccounts.reduce((s, a) => s + (a.followerCount  || 0), 0)
-  const totalEngagement = totalLikes + totalComments + totalShares + totalSaves
+  // Prefer Layer B overview summary when available; fall back to inline computation.
+  const ov = overview?.summary
+  const totalLikes     = ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.likes, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.likes || 0), 0)
+  const totalComments  = ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.comments, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.commentsCount || 0), 0)
+  const totalReach     = ov ? ov.totalReach : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.reach || 0), 0)
+  const totalShares    = ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.shares, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0)
+  const totalSaves     = ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.saves, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.saves || 0), 0)
+  const totalFollowers = ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.followers, 0) : client.socialAccounts.reduce((s, a) => s + (a.followerCount || 0), 0)
+  const totalEngagement = ov ? ov.totalEngagement : (totalLikes + totalComments + totalShares + totalSaves)
   const engagementRate = totalFollowers > 0 ? ((totalEngagement / (allPosts.length || 1)) / totalFollowers * 100) : 0
 
   // Group accounts by platform
@@ -250,12 +258,20 @@ export default function ClientDetail() {
     p.posts.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
   }
 
-  const chartData = client.socialAccounts.map(a => ({
-    name:   a.handle,
-    likes:  a.posts.reduce((s, p) => s + (p.metrics?.[0]?.likes  || 0), 0),
-    shares: a.posts.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0),
-    saves:  a.posts.reduce((s, p) => s + (p.metrics?.[0]?.saves  || 0), 0),
-  }))
+  // Engagement-by-account chart: prefer overview when available.
+  const chartData = overview?.chartData?.platformTotals
+    ? overview.chartData.platformTotals.map(p => ({
+        name:   p.handle,
+        likes:  p.likes,
+        shares: p.shares,
+        saves:  p.saves,
+      }))
+    : client.socialAccounts.map(a => ({
+        name:   a.handle,
+        likes:  a.posts.reduce((s, p) => s + (p.metrics?.[0]?.likes  || 0), 0),
+        shares: a.posts.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0),
+        saves:  a.posts.reduce((s, p) => s + (p.metrics?.[0]?.saves  || 0), 0),
+      }))
 
   const hasMessagingAccounts = client.socialAccounts.some(
     a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK'
@@ -535,6 +551,10 @@ export default function ClientDetail() {
       {/* Social tab */}
       {tab === 'Social' && showSocial && (
         <>
+          {/* Freshness badges + deterministic insights from Layer B */}
+          <FreshnessBadges freshness={overview?.freshness} />
+          <RuleInsightsPanel ruleInsights={overview?.ruleInsights} />
+
           {/* Overall stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-8">
             <StatCard label="Followers"       value={fmt(totalFollowers)} />
