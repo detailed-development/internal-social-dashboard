@@ -9,6 +9,7 @@
  * @param {{ clientId: string }} params
  * @returns {Promise<{
  *   socialLastChangedAt: string | null,
+ *   socialMetricsLastRefreshedAt: string | null,
  *   socialLastSyncedAt: string | null,
  *   messagesLastChangedAt: string | null,
  *   messagesLastSyncedAt: string | null,
@@ -18,7 +19,7 @@
  * }>}
  */
 export async function buildFreshness(prisma, { clientId }) {
-  const [socialSyncMax, socialPostMax, socialCommentMax, messageSyncMax, messageChangeMax, webMax, postCount, transcriptionCount] = await Promise.all([
+  const [socialSyncMax, socialPostMax, socialCommentMax, socialMetricMax, messageSyncMax, messageChangeMax, webMax, postCount, transcriptionCount] = await Promise.all([
     prisma.socialAccount.aggregate({
       where: { clientId },
       _max: { lastSyncedAt: true },
@@ -30,6 +31,10 @@ export async function buildFreshness(prisma, { clientId }) {
     prisma.comment.aggregate({
       where: { post: { socialAccount: { clientId } } },
       _max: { postedAt: true },
+    }),
+    prisma.postMetric.aggregate({
+      where: { post: { socialAccount: { clientId } } },
+      _max: { recordedAt: true },
     }),
     prisma.conversation.aggregate({
       where: { socialAccount: { clientId } },
@@ -77,6 +82,7 @@ export async function buildFreshness(prisma, { clientId }) {
 
   return {
     socialLastChangedAt: toIsoOrNull(socialLastChangedAt),
+    socialMetricsLastRefreshedAt: toIsoOrNull(socialMetricMax._max.recordedAt),
     socialLastSyncedAt: toIsoOrNull(socialSyncMax._max.lastSyncedAt),
     messagesLastChangedAt: toIsoOrNull(messagesLastChangedAt),
     messagesLastSyncedAt: toIsoOrNull(messageSyncMax._max.lastSyncedAt),

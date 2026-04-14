@@ -43,6 +43,7 @@ const makePrisma = () => ({
 describe('platform comment sync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    axios.get.mockReset();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-14T18:05:50.000Z'));
   });
@@ -101,6 +102,49 @@ describe('platform comment sync', () => {
     );
   });
 
+  it('bumps Instagram metric recordedAt when refreshing an existing metric row', async () => {
+    const prisma = makePrisma();
+    prisma.post.findUnique.mockResolvedValueOnce({ id: 'post-1' });
+    prisma.postMetric.findFirst.mockResolvedValueOnce({ id: 'metric-1' });
+
+    axios.get
+      .mockResolvedValueOnce({ data: { followers_count: 120 } })
+      .mockResolvedValueOnce({
+        data: {
+          data: [{
+            id: 'ig-post-1',
+            caption: 'caption',
+            media_type: 'IMAGE',
+            media_url: 'https://example.com/image.jpg',
+            permalink: 'https://instagram.com/p/1',
+            timestamp: '2026-04-14T17:00:00.000Z',
+            like_count: 4,
+            comments_count: 3,
+          }],
+        },
+      })
+      .mockResolvedValueOnce({ data: { data: [] } });
+
+    await syncInstagram(prisma, {
+      id: 'account-1',
+      handle: 'test-ig',
+      platformUserId: 'ig-user-1',
+      accessToken: 'token',
+      lastSyncedAt: new Date('2026-04-14T00:00:00.000Z'),
+    });
+
+    expect(prisma.postMetric.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'metric-1' },
+        data: expect.objectContaining({
+          likes: 4,
+          commentsCount: 3,
+          recordedAt: new Date('2026-04-14T18:05:50.000Z'),
+        }),
+      }),
+    );
+  });
+
   it('skips Facebook comments with missing or blank messages', async () => {
     const prisma = makePrisma();
 
@@ -148,6 +192,53 @@ describe('platform comment sync', () => {
         create: expect.objectContaining({
           platformCommentId: 'fb-comment-3',
           body: 'Looks good',
+        }),
+      }),
+    );
+  });
+
+  it('bumps Facebook metric recordedAt when refreshing an existing metric row', async () => {
+    const prisma = makePrisma();
+    prisma.post.findUnique.mockResolvedValueOnce({ id: 'post-1' });
+    prisma.postMetric.findFirst.mockResolvedValueOnce({ id: 'metric-1' });
+
+    axios.get
+      .mockResolvedValueOnce({ data: { followers_count: 80 } })
+      .mockResolvedValueOnce({
+        data: {
+          data: [{
+            id: 'fb-post-1',
+            message: 'hello',
+            created_time: '2026-03-01T12:00:00.000Z',
+            permalink_url: 'https://facebook.com/p/1',
+          }],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          likes: { summary: { total_count: 2 } },
+          comments: { summary: { total_count: 3 } },
+          shares: { count: 1 },
+        },
+      })
+      .mockResolvedValueOnce({ data: { data: [] } });
+
+    await syncFacebook(prisma, {
+      id: 'account-2',
+      handle: 'test-fb',
+      platformUserId: 'fb-user-1',
+      accessToken: 'token',
+      lastSyncedAt: new Date('2026-04-14T00:00:00.000Z'),
+    });
+
+    expect(prisma.postMetric.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'metric-1' },
+        data: expect.objectContaining({
+          likes: 2,
+          commentsCount: 3,
+          shares: 1,
+          recordedAt: new Date('2026-04-14T18:05:50.000Z'),
         }),
       }),
     );

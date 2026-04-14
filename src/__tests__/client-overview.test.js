@@ -126,6 +126,9 @@ function buildFixturePrisma() {
       aggregate: vi.fn().mockResolvedValue({ _max: { publishedAt: new Date('2026-04-11T08:00:00Z') } }),
       count: vi.fn().mockResolvedValue(0),
     },
+    postMetric: {
+      aggregate: vi.fn().mockResolvedValue({ _max: { recordedAt: new Date('2026-04-14T18:00:00Z') } }),
+    },
     comment: {
       aggregate: vi.fn().mockResolvedValue({ _max: { postedAt: new Date('2026-04-11T09:00:00Z') } }),
     },
@@ -216,6 +219,7 @@ describe('buildClientOverview', () => {
     expect(res.ruleInsights).toHaveProperty('wins');
     expect(res.ruleInsights).toHaveProperty('risks');
     expect(res.freshness.socialLastChangedAt).toBe('2026-04-11T09:00:00.000Z');
+    expect(res.freshness.socialMetricsLastRefreshedAt).toBe('2026-04-14T18:00:00.000Z');
     expect(res.freshness.messagesLastChangedAt).toBeNull();
     expect(res.promptContext.socialData).toContain('acme-ig');
   });
@@ -256,6 +260,7 @@ describe('buildRuleInsights', () => {
       freshness: { socialLastSyncedAt: hoursAgo(30), messagesLastSyncedAt: null, webAnalyticsLastSyncedAt: null, transcriptionCoveragePct: null },
     });
     expect(insights.risks.find((r) => r.code === 'STALE_SYNC')).toBeDefined();
+    expect(insights.risks.find((r) => r.code === 'STALE_SYNC')?.message).toMatch(/sync has not completed/i);
   });
 
   it('flags NO_POSTS_IN_RANGE when posts==0', () => {

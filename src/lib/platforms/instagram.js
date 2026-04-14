@@ -93,7 +93,7 @@ export async function syncInstagram(prisma, account) {
     if (existing) {
       await prisma.postMetric.update({
         where: { id: existing.id },
-        data: { likes, commentsCount: comments, impressions, reach, shares, saves },
+        data: { likes, commentsCount: comments, impressions, reach, shares, saves, recordedAt: new Date() },
       });
     } else {
       await prisma.postMetric.create({

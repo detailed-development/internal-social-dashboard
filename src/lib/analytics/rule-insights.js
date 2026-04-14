@@ -78,13 +78,13 @@ export function buildRuleInsights({ summary, priorSummary, chartData, freshness 
       risks.push({
         code: 'STALE_SYNC',
         severity: 'high',
-        message: `Social data is ${Math.round(ageHours)} hours old — sync may be failing.`,
+        message: `Social sync has not completed in ${Math.round(ageHours)} hours — refresh may be failing.`,
       });
     } else if (ageHours > 24) {
       risks.push({
         code: 'STALE_SYNC',
         severity: 'medium',
-        message: `Social data is ${Math.round(ageHours)} hours old.`,
+        message: `Social sync has not completed in ${Math.round(ageHours)} hours.`,
       });
     }
   } else if (summary.totalPosts > 0) {
@@ -92,7 +92,7 @@ export function buildRuleInsights({ summary, priorSummary, chartData, freshness 
     anomalies.push({
       code: 'NO_SYNC_TIMESTAMP',
       severity: 'low',
-      message: 'Posts exist but no social account reports a successful sync timestamp.',
+      message: 'Posts exist but no social account reports a successful sync check.',
     });
   }
 

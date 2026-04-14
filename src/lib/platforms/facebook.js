@@ -98,7 +98,7 @@ export async function syncFacebook(prisma, account) {
     if (existing) {
       await prisma.postMetric.update({
         where: { id: existing.id },
-        data: { likes, commentsCount: comments, shares, impressions, reach },
+        data: { likes, commentsCount: comments, shares, impressions, reach, recordedAt: new Date() },
       });
     } else {
       await prisma.postMetric.create({

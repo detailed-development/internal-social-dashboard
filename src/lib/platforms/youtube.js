@@ -167,7 +167,7 @@ export async function syncYouTube(prisma, account) {
     if (existingMetric) {
       await prisma.postMetric.update({
         where: { id: existingMetric.id },
-        data: { likes, commentsCount, videoPlays },
+        data: { likes, commentsCount, videoPlays, recordedAt: new Date() },
       });
     } else {
       await prisma.postMetric.create({

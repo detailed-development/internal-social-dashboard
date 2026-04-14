@@ -37,23 +37,36 @@ function Badge({ label, value }) {
 
 export default function FreshnessBadges({ freshness }) {
   if (!freshness) return null
-  const socialValue = freshness.socialLastChangedAt ?? freshness.socialLastSyncedAt
-  const messagesValue = freshness.messagesLastChangedAt ?? freshness.messagesLastSyncedAt
-  const webValue = freshness.webAnalyticsLastChangedAt ?? freshness.webAnalyticsLastSyncedAt
+  const theme = useTheme()
+
+  const badges = [
+    { label: 'Social content', value: freshness.socialLastChangedAt ?? freshness.socialLastSyncedAt },
+    { label: 'Social metrics', value: freshness.socialMetricsLastRefreshedAt ?? freshness.socialLastSyncedAt },
+    { label: 'Social checked', value: freshness.socialLastSyncedAt },
+    { label: 'Messages changed', value: freshness.messagesLastChangedAt ?? freshness.messagesLastSyncedAt },
+    { label: 'Messages checked', value: freshness.messagesLastSyncedAt },
+    { label: 'Web latest day', value: freshness.webAnalyticsLastChangedAt ?? freshness.webAnalyticsLastSyncedAt },
+  ]
+
   return (
-    <div className="flex flex-wrap gap-1.5 mb-4">
-      <Badge label="Social" value={socialValue} />
-      <Badge label="Messages" value={messagesValue} />
-      <Badge label="Web" value={webValue} />
-      {freshness.transcriptionCoveragePct != null && (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-          freshness.transcriptionCoveragePct >= 80
-            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
-        }`}>
-          Transcribed: {freshness.transcriptionCoveragePct}%
-        </span>
-      )}
+    <div className="mb-4">
+      <div className="flex flex-wrap gap-1.5">
+        {badges.map((badge) => (
+          <Badge key={badge.label} label={badge.label} value={badge.value} />
+        ))}
+        {freshness.transcriptionCoveragePct != null && (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            freshness.transcriptionCoveragePct >= 80
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+          }`}>
+            Transcribed: {freshness.transcriptionCoveragePct}%
+          </span>
+        )}
+      </div>
+      <p className={`mt-2 text-[11px] ${theme.subtext}`}>
+        Content and message badges show newest source activity. Metrics shows the latest engagement snapshot. Checked shows the last successful sync.
+      </p>
     </div>
   )
 }

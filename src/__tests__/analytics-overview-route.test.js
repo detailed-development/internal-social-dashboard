@@ -22,6 +22,9 @@ const mockPrisma = {
     aggregate: vi.fn().mockResolvedValue({ _max: { publishedAt: null } }),
     count: vi.fn().mockResolvedValue(0),
   },
+  postMetric: {
+    aggregate: vi.fn().mockResolvedValue({ _max: { recordedAt: null } }),
+  },
   comment: {
     aggregate: vi.fn().mockResolvedValue({ _max: { postedAt: null } }),
   },
@@ -77,6 +80,7 @@ describe('GET /api/analytics/clients/:slug/overview', () => {
     expect(res.body.ruleInsights).toHaveProperty('wins');
     expect(res.body.freshness).toHaveProperty('socialLastSyncedAt');
     expect(res.body.freshness).toHaveProperty('socialLastChangedAt');
+    expect(res.body.freshness).toHaveProperty('socialMetricsLastRefreshedAt');
     expect(res.body.freshness).toHaveProperty('messagesLastChangedAt');
     // promptContext must be omitted from public API
     expect(res.body.promptContext).toBeUndefined();
