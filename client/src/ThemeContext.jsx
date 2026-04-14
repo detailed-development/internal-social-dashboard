@@ -36,9 +36,12 @@ export const THEMES = {
     adminLinkActive: 'bg-indigo-600 text-white',
     adminLinkInactive: 'text-gray-500 hover:bg-gray-800 hover:text-white',
 
-    // Cards
+    // Cards + surfaces
     card: 'bg-white border-gray-200',
     cardDivider: 'border-gray-100',
+    surfaceMuted: 'bg-gray-50',
+    dividerSoft: 'border-gray-200/80',
+    progressTrack: 'bg-gray-100',
 
     // Typography
     heading: 'text-gray-900',
@@ -76,6 +79,34 @@ export const THEMES = {
     settingsPanel: 'border-gray-200 bg-white shadow-lg',
     settingsLabel: 'text-gray-700',
     settingsHeading: 'text-gray-500',
+
+    // Semantic status tokens
+    status: {
+      fresh: {
+        pill: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        card: 'border-emerald-200/90',
+        dot: 'bg-emerald-500',
+        bar: 'bg-emerald-500',
+      },
+      aging: {
+        pill: 'bg-amber-50 text-amber-700 border-amber-200',
+        card: 'border-amber-200/90',
+        dot: 'bg-amber-500',
+        bar: 'bg-amber-500',
+      },
+      stale: {
+        pill: 'bg-red-50 text-red-700 border-red-200',
+        card: 'border-red-200/90',
+        dot: 'bg-red-500',
+        bar: 'bg-red-500',
+      },
+      unknown: {
+        pill: 'bg-gray-100 text-gray-600 border-gray-200',
+        card: 'border-gray-200/90',
+        dot: 'bg-gray-400',
+        bar: 'bg-gray-400',
+      },
+    },
 
     // Misc
     code: 'bg-gray-100',
@@ -137,9 +168,12 @@ export const THEMES = {
     adminLinkActive: 'bg-lime-400 text-gray-900 font-semibold neon-active',
     adminLinkInactive: 'text-gray-500 hover:bg-gray-800 hover:text-lime-300',
 
-    // Cards
+    // Cards + surfaces
     card: 'bg-white border-fuchsia-200 neon-card',
     cardDivider: 'border-fuchsia-100',
+    surfaceMuted: 'bg-fuchsia-50/60',
+    dividerSoft: 'border-fuchsia-200/80',
+    progressTrack: 'bg-fuchsia-100',
 
     // Typography
     heading: 'text-gray-900',
@@ -177,6 +211,34 @@ export const THEMES = {
     settingsPanel: 'border-fuchsia-200 bg-white shadow-lg shadow-fuchsia-100',
     settingsLabel: 'text-gray-700',
     settingsHeading: 'text-fuchsia-400',
+
+    // Semantic status tokens
+    status: {
+      fresh: {
+        pill: 'bg-lime-100 text-lime-800 border-lime-200',
+        card: 'border-lime-300/90',
+        dot: 'bg-lime-500',
+        bar: 'bg-lime-500',
+      },
+      aging: {
+        pill: 'bg-amber-50 text-amber-700 border-amber-200',
+        card: 'border-amber-300/90',
+        dot: 'bg-amber-500',
+        bar: 'bg-amber-500',
+      },
+      stale: {
+        pill: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+        card: 'border-fuchsia-300/90',
+        dot: 'bg-fuchsia-500',
+        bar: 'bg-fuchsia-500',
+      },
+      unknown: {
+        pill: 'bg-gray-100 text-gray-600 border-gray-200',
+        card: 'border-fuchsia-200/80',
+        dot: 'bg-gray-400',
+        bar: 'bg-gray-400',
+      },
+    },
 
     // Misc
     code: 'bg-fuchsia-50',
@@ -238,9 +300,12 @@ export const THEMES = {
     adminLinkActive: 'bg-indigo-600 text-white',
     adminLinkInactive: 'text-gray-500 hover:bg-gray-700 hover:text-white',
 
-    // Cards
+    // Cards + surfaces
     card: 'bg-gray-700 border-gray-600',
     cardDivider: 'border-gray-600',
+    surfaceMuted: 'bg-gray-800/70',
+    dividerSoft: 'border-white/10',
+    progressTrack: 'bg-gray-800',
 
     // Typography
     heading: 'text-gray-100',
@@ -278,6 +343,34 @@ export const THEMES = {
     settingsPanel: 'border-gray-600 bg-gray-700 shadow-lg shadow-black/40',
     settingsLabel: 'text-gray-300',
     settingsHeading: 'text-gray-500',
+
+    // Semantic status tokens
+    status: {
+      fresh: {
+        pill: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/70',
+        card: 'border-emerald-700/60',
+        dot: 'bg-emerald-400',
+        bar: 'bg-emerald-400',
+      },
+      aging: {
+        pill: 'bg-amber-900/40 text-amber-300 border-amber-700/70',
+        card: 'border-amber-700/60',
+        dot: 'bg-amber-400',
+        bar: 'bg-amber-400',
+      },
+      stale: {
+        pill: 'bg-red-900/40 text-red-300 border-red-700/70',
+        card: 'border-red-700/60',
+        dot: 'bg-red-400',
+        bar: 'bg-red-400',
+      },
+      unknown: {
+        pill: 'bg-gray-800 text-gray-300 border-gray-600',
+        card: 'border-gray-600',
+        dot: 'bg-gray-400',
+        bar: 'bg-gray-400',
+      },
+    },
 
     // Misc
     code: 'bg-gray-900',

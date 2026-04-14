@@ -18,24 +18,24 @@ function staleness(isoString) {
   return 'fresh'
 }
 
-const BADGE_STYLES = {
-  fresh:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
-  aging:   'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300',
-  stale:   'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300',
-  unknown: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+function getStatusTone(theme, state) {
+  return theme.status?.[state] || theme.status?.unknown || {
+    pill: 'bg-gray-100 text-gray-600 border border-gray-200',
+    card: 'border-gray-200',
+    dot: 'bg-gray-400',
+    bar: 'bg-gray-400',
+  }
 }
 
-const CARD_STYLES = {
-  fresh:   'border-emerald-200',
-  aging:   'border-amber-200',
-  stale:   'border-red-200',
-  unknown: 'border-gray-200',
-}
-
-function StatusPill({ state }) {
+function StatusPill({ state, theme }) {
+  const tone = getStatusTone(theme, state)
   const label = state === 'unknown' ? 'Unknown' : state[0].toUpperCase() + state.slice(1)
+
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${BADGE_STYLES[state]}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${tone.pill}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
       {label}
     </span>
   )
@@ -43,28 +43,35 @@ function StatusPill({ state }) {
 
 function Detail({ label, value, theme }) {
   return (
-    <div className="flex items-center gap-1">
-      <span className={`text-[11px] ${theme.subtext}`}>{label}:</span>
-      <span className={`text-[11px] font-medium ${theme.body}`}>{value ? timeAgo(value) : 'No data'}</span>
+    <div className="flex items-baseline justify-between gap-3">
+      <span className={`text-xs ${theme.subtext}`}>{label}</span>
+      <span className={`text-sm font-medium text-right ${theme.body}`}>
+        {value ? timeAgo(value) : 'No data'}
+      </span>
     </div>
   )
 }
 
 function StatusCard({ title, primaryLabel, primaryValue, details = [], theme, className = '' }) {
   const state = primaryValue ? staleness(primaryValue) : 'unknown'
+  const tone = getStatusTone(theme, state)
+
   return (
-    <div className={`rounded-xl border p-4 shadow-sm ${theme.card} ${CARD_STYLES[state]} ${className}`}>
+    <div className={`rounded-xl border p-4 shadow-sm ${theme.card} ${tone.card} ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${theme.subtext}`}>{title}</p>
-          <p className={`mt-1 text-sm font-semibold ${theme.heading}`}>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${theme.subtext}`}>
+            {title}
+          </p>
+          <p className={`mt-2 text-base font-semibold leading-tight ${theme.heading}`}>
             {primaryLabel}: {primaryValue ? timeAgo(primaryValue) : 'No data'}
           </p>
         </div>
-        <StatusPill state={state} />
+        <StatusPill state={state} theme={theme} />
       </div>
+
       {details.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-black/5 pt-3">
+        <div className={`mt-4 space-y-2 border-t pt-3 ${theme.dividerSoft || theme.cardDivider}`}>
           {details.map((detail) => (
             <Detail key={`${title}-${detail.label}`} label={detail.label} value={detail.value} theme={theme} />
           ))}
@@ -75,8 +82,8 @@ function StatusCard({ title, primaryLabel, primaryValue, details = [], theme, cl
 }
 
 export default function FreshnessBadges({ freshness }) {
+  const { theme } = useTheme()
   if (!freshness) return null
-  const theme = useTheme()
 
   const socialContent = freshness.socialLastChangedAt ?? freshness.socialLastSyncedAt
   const socialMetrics = freshness.socialMetricsLastRefreshedAt ?? freshness.socialLastSyncedAt
@@ -87,15 +94,19 @@ export default function FreshnessBadges({ freshness }) {
   const transcriptionPct = freshness.transcriptionCoveragePct
   const transcriptionState =
     transcriptionPct == null ? 'unknown' : transcriptionPct >= 80 ? 'fresh' : transcriptionPct >= 40 ? 'aging' : 'stale'
+  const transcriptionTone = getStatusTone(theme, transcriptionState)
 
   return (
     <div className="mb-4">
       <div className="flex items-end justify-between gap-3 mb-3">
         <div>
           <h3 className={`text-sm font-semibold ${theme.heading}`}>Freshness Stats</h3>
-          <p className={`text-[11px] ${theme.subtext}`}>Grouped by source activity, metric refreshes, and sync health.</p>
+          <p className={`text-xs ${theme.subtext}`}>
+            Grouped by source activity, metric refreshes, and sync health.
+          </p>
         </div>
       </div>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
         <StatusCard
           title="Social"
@@ -108,6 +119,7 @@ export default function FreshnessBadges({ freshness }) {
           theme={theme}
           className="xl:col-span-4"
         />
+
         <StatusCard
           title="Messages"
           primaryLabel="Checked"
@@ -118,6 +130,7 @@ export default function FreshnessBadges({ freshness }) {
           theme={theme}
           className="xl:col-span-4"
         />
+
         <StatusCard
           title="Website Metrics"
           primaryLabel="Last updated"
@@ -125,21 +138,25 @@ export default function FreshnessBadges({ freshness }) {
           theme={theme}
           className="xl:col-span-2"
         />
-        <div className={`rounded-xl border p-4 shadow-sm ${theme.card} ${CARD_STYLES[transcriptionState]} xl:col-span-2`}>
+
+        <div className={`rounded-xl border p-4 shadow-sm ${theme.card} ${transcriptionTone.card} xl:col-span-2`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${theme.subtext}`}>Transcribed</p>
-              <p className={`mt-1 text-sm font-semibold ${theme.heading}`}>
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${theme.subtext}`}>
+                Transcribed
+              </p>
+              <p className={`mt-2 text-base font-semibold leading-tight ${theme.heading}`}>
                 {transcriptionPct == null ? 'No data' : `${transcriptionPct}% completed`}
               </p>
             </div>
-            <StatusPill state={transcriptionState} />
+            <StatusPill state={transcriptionState} theme={theme} />
           </div>
+
           {transcriptionPct != null && (
-            <div className="mt-3">
-              <div className="h-1.5 rounded-full bg-black/5 overflow-hidden">
+            <div className="mt-4">
+              <div className={`h-2 rounded-full overflow-hidden ${theme.progressTrack || 'bg-gray-100'}`}>
                 <div
-                  className={`h-full rounded-full ${transcriptionPct >= 80 ? 'bg-emerald-500' : transcriptionPct >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                  className={`h-full rounded-full ${transcriptionTone.bar}`}
                   style={{ width: `${Math.max(0, Math.min(100, transcriptionPct))}%` }}
                 />
               </div>
