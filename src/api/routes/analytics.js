@@ -55,53 +55,48 @@ router.get('/client/:slug/web', async (req, res) => {
     const client = await prisma.client.findUnique({ where: { slug: req.params.slug } });
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
-    // Daily totals (last 30 days)
-    const daily = await prisma.webAnalytic.findMany({
-      where: { clientId: client.id, source: 'all', medium: 'all' },
-      orderBy: { date: 'asc' },
-      take: 30,
-    });
-
-    // Traffic source breakdown
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const sources = await prisma.webAnalytic.findMany({
-      where: {
-        clientId: client.id,
-        date: today,
-        source: { notIn: ['all', '_device', '_page'] },
-      },
-      orderBy: { sessions: 'desc' },
-      take: 10,
-    });
-
-    // Device breakdown
-    const devices = await prisma.webAnalytic.findMany({
-      where: { clientId: client.id, date: today, source: '_device' },
-      orderBy: { sessions: 'desc' },
-    });
-
-    // Top landing pages
-    const pages = await prisma.webAnalytic.findMany({
-      where: { clientId: client.id, date: today, source: '_page' },
-      orderBy: { sessions: 'desc' },
-      take: 10,
-    });
+    const [dailyRows = [], sourceRows = [], deviceRows = [], pageRows = []] = await Promise.all([
+      prisma.webAnalytic.findMany({
+        where: { clientId: client.id, source: 'all', medium: 'all' },
+        orderBy: { date: 'asc' },
+        take: 30,
+      }),
+      prisma.webAnalytic.findMany({
+        where: {
+          clientId: client.id,
+          date: today,
+          source: { notIn: ['all', '_device', '_page'] },
+        },
+        orderBy: { sessions: 'desc' },
+        take: 10,
+      }),
+      prisma.webAnalytic.findMany({
+        where: { clientId: client.id, date: today, source: '_device' },
+        orderBy: { sessions: 'desc' },
+      }),
+      prisma.webAnalytic.findMany({
+        where: { clientId: client.id, date: today, source: '_page' },
+        orderBy: { sessions: 'desc' },
+        take: 10,
+      }),
+    ]);
 
     // 30-day totals
-    const totals = daily.reduce((acc, row) => ({
+    const totals = dailyRows.reduce((acc, row) => ({
       sessions:  acc.sessions  + row.sessions,
       users:     acc.users     + row.users,
       newUsers:  acc.newUsers  + row.newUsers,
       pageviews: acc.pageviews + row.pageviews,
     }), { sessions: 0, users: 0, newUsers: 0, pageviews: 0 });
 
-    const avgBounceRate = daily.length
-      ? daily.reduce((s, r) => s + (r.bounceRate || 0), 0) / daily.length
+    const avgBounceRate = dailyRows.length
+      ? dailyRows.reduce((s, r) => s + (r.bounceRate || 0), 0) / dailyRows.length
       : null;
 
-    const avgSessionDuration = daily.length
-      ? daily.reduce((s, r) => s + (r.avgSessionDuration || 0), 0) / daily.length
+    const avgSessionDuration = dailyRows.length
+      ? dailyRows.reduce((s, r) => s + (r.avgSessionDuration || 0), 0) / dailyRows.length
       : null;
 
     const engagementRate = avgBounceRate != null ? 1 - avgBounceRate : null;
@@ -110,10 +105,10 @@ router.get('/client/:slug/web', async (req, res) => {
       gaPropertyId: client.gaPropertyId,
       websiteUrl:   client.websiteUrl,
       totals:       { ...totals, avgBounceRate, avgSessionDuration, engagementRate },
-      daily,
-      sources,
-      devices: devices.map(d => ({ device: d.medium, sessions: d.sessions, users: d.users, pageviews: d.pageviews })),
-      pages: pages.map(p => ({ path: p.medium, sessions: p.sessions, users: p.users, pageviews: p.pageviews })),
+      daily: dailyRows,
+      sources: sourceRows,
+      devices: deviceRows.map(d => ({ device: d.medium, sessions: d.sessions, users: d.users, pageviews: d.pageviews })),
+      pages: pageRows.map(p => ({ path: p.medium, sessions: p.sessions, users: p.users, pageviews: p.pageviews })),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
