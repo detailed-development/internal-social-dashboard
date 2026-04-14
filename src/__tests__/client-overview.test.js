@@ -101,7 +101,7 @@ function buildFixturePrisma() {
       }),
       aggregate: vi.fn().mockResolvedValue({ _max: { lastSyncedAt: new Date() } }),
     },
-    conversation: { aggregate: vi.fn().mockResolvedValue({ _max: { lastSyncedAt: null } }) },
+    conversation: { aggregate: vi.fn().mockResolvedValue({ _max: { lastSyncedAt: null, lastMessageAt: null } }) },
     webAnalytic: {
       findMany: vi.fn(({ where }) => {
         let filtered = webAnalytics.filter((w) => {
@@ -123,7 +123,11 @@ function buildFixturePrisma() {
         // coverage calc. For freshness, caller passes mediaType filter.
         return Promise.resolve([]);
       }),
+      aggregate: vi.fn().mockResolvedValue({ _max: { publishedAt: new Date('2026-04-11T08:00:00Z') } }),
       count: vi.fn().mockResolvedValue(0),
+    },
+    comment: {
+      aggregate: vi.fn().mockResolvedValue({ _max: { postedAt: new Date('2026-04-11T09:00:00Z') } }),
     },
     clientPlatformDailyMetric: {
       findMany: vi.fn(({ where }) => Promise.resolve(
@@ -211,6 +215,8 @@ describe('buildClientOverview', () => {
     expect(res.chartData.trafficSources.length).toBe(1);
     expect(res.ruleInsights).toHaveProperty('wins');
     expect(res.ruleInsights).toHaveProperty('risks');
+    expect(res.freshness.socialLastChangedAt).toBe('2026-04-11T09:00:00.000Z');
+    expect(res.freshness.messagesLastChangedAt).toBeNull();
     expect(res.promptContext.socialData).toContain('acme-ig');
   });
 

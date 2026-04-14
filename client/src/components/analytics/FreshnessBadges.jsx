@@ -37,11 +37,14 @@ function Badge({ label, value }) {
 
 export default function FreshnessBadges({ freshness }) {
   if (!freshness) return null
+  const socialValue = freshness.socialLastChangedAt ?? freshness.socialLastSyncedAt
+  const messagesValue = freshness.messagesLastChangedAt ?? freshness.messagesLastSyncedAt
+  const webValue = freshness.webAnalyticsLastChangedAt ?? freshness.webAnalyticsLastSyncedAt
   return (
     <div className="flex flex-wrap gap-1.5 mb-4">
-      <Badge label="Social" value={freshness.socialLastSyncedAt} />
-      <Badge label="Messages" value={freshness.messagesLastSyncedAt} />
-      <Badge label="Web" value={freshness.webAnalyticsLastSyncedAt} />
+      <Badge label="Social" value={socialValue} />
+      <Badge label="Messages" value={messagesValue} />
+      <Badge label="Web" value={webValue} />
       {freshness.transcriptionCoveragePct != null && (
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
           freshness.transcriptionCoveragePct >= 80
