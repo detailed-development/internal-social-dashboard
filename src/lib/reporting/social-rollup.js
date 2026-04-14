@@ -56,7 +56,7 @@ export async function rebuildSocialRollups(prisma, { clientId, dateStart, dateEn
       date: toUtcDateOnly(p.publishedAt),
       platform: p.socialAccount.platform,
       mediaType: p.mediaType,
-      captionPreview: (p.caption || '').slice(0, 160) || null,
+      captionPreview: sanitizeCaption(p.caption),
       likes,
       commentsCount,
       shares,
@@ -114,32 +114,31 @@ export async function rebuildSocialRollups(prisma, { clientId, dateStart, dateEn
       : []),
   ]);
 
-  // ClientPostPerformance is keyed by postId, so we don't delete by date
-  // range (a post's date doesn't change). Instead, upsert each post row so
-  // the latest metrics are reflected. This is the safest correctness model:
-  // a post stays in the table until the underlying Post is deleted (cascade).
-  for (const row of postRows) {
-    await prisma.clientPostPerformance.upsert({
-      where: { postId: row.postId },
-      create: row,
-      update: {
-        date: row.date,
-        platform: row.platform,
-        mediaType: row.mediaType,
-        captionPreview: row.captionPreview,
-        likes: row.likes,
-        commentsCount: row.commentsCount,
-        shares: row.shares,
-        saves: row.saves,
-        reach: row.reach,
-        impressions: row.impressions,
-        engagement: row.engagement,
-        socialAccountId: row.socialAccountId,
-      },
+  // ClientPostPerformance: delete-and-recreate per post. We use individual
+  // creates inside a transaction instead of createMany because Prisma's
+  // batch SQL construction can mishandle emoji-heavy captions as incomplete
+  // hex escapes in Postgres.
+  if (postRows.length > 0) {
+    const postIds = postRows.map((r) => r.postId);
+    await prisma.clientPostPerformance.deleteMany({
+      where: { postId: { in: postIds } },
     });
+    await prisma.$transaction(
+      postRows.map((row) => prisma.clientPostPerformance.create({ data: row }))
+    );
   }
 
   return { dailyMetricsWritten: dailyRows.length, postsWritten: postRows.length };
+}
+
+function sanitizeCaption(raw) {
+  if (!raw) return null;
+  // Strip null bytes, then truncate by code points (not code units) so we
+  // never split a surrogate pair. VarChar(160) in Postgres counts characters
+  // (code points), not bytes, so this is also the semantically correct limit.
+  const clean = raw.replace(/\x00/g, '');
+  const codePoints = Array.from(clean);
+  return (codePoints.length > 160 ? codePoints.slice(0, 160).join('') : clean) || null;
 }
 
 function endOfDay(d) {

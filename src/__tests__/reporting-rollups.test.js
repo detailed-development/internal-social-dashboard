@@ -34,9 +34,10 @@ function makePrisma() {
       createMany: captureCreateMany('platformDaily'),
     },
     clientPostPerformance: {
-      upsert: vi.fn(({ create }) => {
-        writes.postPerformance.push(create);
-        return Promise.resolve(create);
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: vi.fn(({ data }) => {
+        writes.postPerformance.push(data);
+        return Promise.resolve(data);
       }),
     },
     clientWebDailyMetric: {
