@@ -115,10 +115,13 @@ export async function syncInstagram(prisma, account) {
           params: { fields: 'id,text,username,timestamp', limit: 50, access_token: accessToken },
         });
         for (const c of commentsRes.data.data ?? []) {
+          const body = typeof c.text === 'string' ? c.text : '';
+          if (!body.trim()) continue;
+
           await prisma.comment.upsert({
             where: { postId_platformCommentId: { postId: post.id, platformCommentId: c.id } },
-            update: { body: c.text },
-            create: { postId: post.id, platformCommentId: c.id, authorName: c.username ?? null, body: c.text, postedAt: new Date(c.timestamp) },
+            update: { body },
+            create: { postId: post.id, platformCommentId: c.id, authorName: c.username ?? null, body, postedAt: new Date(c.timestamp) },
           });
         }
       } catch (err) {

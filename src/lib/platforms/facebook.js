@@ -113,10 +113,13 @@ export async function syncFacebook(prisma, account) {
           params: { fields: 'id,message,from,created_time', limit: 50, access_token: accessToken },
         });
         for (const c of commentsRes.data.data ?? []) {
+          const body = typeof c.message === 'string' ? c.message : '';
+          if (!body.trim()) continue;
+
           await prisma.comment.upsert({
             where: { postId_platformCommentId: { postId: post.id, platformCommentId: c.id } },
-            update: { body: c.message },
-            create: { postId: post.id, platformCommentId: c.id, authorName: c.from?.name ?? null, body: c.message, postedAt: new Date(c.created_time) },
+            update: { body },
+            create: { postId: post.id, platformCommentId: c.id, authorName: c.from?.name ?? null, body, postedAt: new Date(c.created_time) },
           });
         }
       } catch (_) {}

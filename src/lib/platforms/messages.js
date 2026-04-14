@@ -43,9 +43,17 @@ export async function syncMessages(prisma, account) {
   } catch (err) {
     const code = err.response?.data?.error?.code;
     const msg  = err.response?.data?.error?.message ?? err.message;
-    // 200 = permission denied, 10 = not allowed by app review – skip silently
-    if (code === 200 || code === 10 || msg?.toLowerCase().includes('permission')) {
-      console.log(`    Skipping message sync for @${account.handle} (${account.platform}): insufficient token permissions`);
+    const lowered = msg?.toLowerCase();
+    // 200 = permission denied, 10/3 = not allowed by app review or missing
+    // product capability. These are configuration issues, not runtime failures.
+    if (
+      code === 200 ||
+      code === 10 ||
+      code === 3 ||
+      lowered?.includes('permission') ||
+      lowered?.includes('capability to make this api call')
+    ) {
+      console.log(`    Skipping message sync for @${account.handle} (${account.platform}): insufficient token permissions or app capability`);
       return;
     }
     throw err;
