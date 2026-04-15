@@ -43,6 +43,7 @@ model Client {
   buzzwordDaily        ClientBuzzwordDaily[]
   reportInputSnapshots ClientReportInputSnapshot[]
   contentPillars       ContentPillar[]
+  reportStyles         ClientReportStyle[]
 
   @@map("clients")
 }
@@ -421,6 +422,20 @@ model ClientBuzzwordDaily {
   @@index([clientId, date])
   @@index([clientId, word, date])
   @@map("client_buzzword_daily")
+}
+
+model ClientReportStyle {
+  id              String   @id @default(cuid())
+  clientId        String   @map("client_id")
+  name            String
+  selectedModules Json     @map("selected_modules")
+  displayOrder    Json?    @map("display_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("client_report_styles")
 }
 
 model ContentPillar {

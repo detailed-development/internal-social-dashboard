@@ -15,6 +15,10 @@ Rules:
 ---
 Generate a comprehensive client-facing report for **{{clientName}}** covering **{{dateRangeStart}}** to **{{dateRangeEnd}}**.
 
+{{#if selectedModules}}
+IMPORTANT: Only generate report sections for the following modules. Skip any section not listed here: {{selectedModules}}
+{{/if}}
+
 ## Social Media Data
 {{socialData}}
 

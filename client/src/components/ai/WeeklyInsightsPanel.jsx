@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { generateWeeklyInsights, generateReportDraft, checkAiGeneration, getCachedIntervals, deleteCachedInterval } from '../../api'
+import { generateWeeklyInsights, generateReportDraft, checkAiGeneration, getCachedIntervals, deleteCachedInterval, getReportStyles, createReportStyle, deleteReportStyle } from '../../api'
 import { useTheme } from '../../ThemeContext'
 import AILoadingState from './AILoadingState'
 import ConfirmGenerateModal from './ConfirmGenerateModal'
@@ -42,8 +42,20 @@ function fmtDisplayDate(dateStr) {
 
 const PIE_COLORS = ['#6366f1', '#f472b6', '#34d399', '#fbbf24', '#60a5fa', '#a78bfa']
 
+const ALL_MODULES = [
+  { key: 'executive_summary', label: 'Executive Summary' },
+  { key: 'social_overview', label: 'Social Performance' },
+  { key: 'platform_comparison', label: 'Platform Comparison' },
+  { key: 'website_ga4', label: 'Website / GA4' },
+  { key: 'top_content', label: 'Top Content' },
+  { key: 'cross_channel', label: 'Cross-Channel Matrix' },
+  { key: 'key_learnings', label: 'Key Learnings' },
+  { key: 'recommendations', label: 'Recommendations' },
+  { key: 'next_period', label: 'Next-Period Focus' },
+]
+
 /* ── Main Component ──────────────────────────────────────────────────────────── */
-export default function WeeklyInsightsPanel({ clientSlug }) {
+export default function WeeklyInsightsPanel({ clientSlug, clientId }) {
   const { theme } = useTheme()
   const c = theme.chart
   const now = new Date()
@@ -69,6 +81,13 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
   const [confirmData, setConfirmData] = useState(null)
   const [confirmChecking, setConfirmChecking] = useState(false)
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
+
+  // Module selector + saved styles
+  const [selectedModules, setSelectedModules] = useState(ALL_MODULES.map(m => m.key))
+  const [showModules, setShowModules] = useState(false)
+  const [reportStyles, setReportStyles] = useState([])
+  const [saveStyleName, setSaveStyleName] = useState('')
+  const [savingStyle, setSavingStyle] = useState(false)
 
   function applyPreset(mode) {
     const n = new Date()
@@ -111,6 +130,34 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
 
   useEffect(() => { fetchCachedIntervals() }, [clientSlug])
 
+  useEffect(() => {
+    if (!clientId) return
+    getReportStyles(clientId).then(setReportStyles).catch(() => {})
+  }, [clientId])
+
+  async function handleSaveStyle(e) {
+    e.preventDefault()
+    if (!saveStyleName.trim() || !clientId) return
+    setSavingStyle(true)
+    try {
+      const style = await createReportStyle({ clientId, name: saveStyleName.trim(), selectedModules })
+      setReportStyles(prev => [...prev, style])
+      setSaveStyleName('')
+    } catch {}
+    setSavingStyle(false)
+  }
+
+  async function handleDeleteStyle(id) {
+    try {
+      await deleteReportStyle(id)
+      setReportStyles(prev => prev.filter(s => s.id !== id))
+    } catch {}
+  }
+
+  function handleLoadStyle(style) {
+    setSelectedModules(style.selectedModules)
+  }
+
   async function openConfirm(forceRefresh = false) {
     if (!clientSlug) return
 
@@ -145,7 +192,13 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
     try {
       const [insightsData, reportData] = await Promise.all([
         generateWeeklyInsights({ clientSlug, dateRangeStart: dateStart, dateRangeEnd: dateEnd, forceRefresh }),
-        generateReportDraft({ clientSlug, dateRangeStart: dateStart, dateRangeEnd: dateEnd, forceRefresh }),
+        generateReportDraft({
+          clientSlug,
+          dateRangeStart: dateStart,
+          dateRangeEnd: dateEnd,
+          forceRefresh,
+          selectedModules: selectedModules.length < ALL_MODULES.length ? selectedModules : null,
+        }),
       ])
       setInsights(insightsData)
       setReport(reportData)
@@ -221,6 +274,82 @@ export default function WeeklyInsightsPanel({ clientSlug }) {
                 {fmtDisplayDate(dateStart)} – {fmtDisplayDate(dateEnd)}
               </p>
             )}
+
+            {/* Module selector */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowModules(v => !v)}
+                className={`text-xs flex items-center gap-1 ${theme.muted} hover:opacity-80`}
+              >
+                <span>Report Modules</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${theme.code}`}>
+                  {selectedModules.length}/{ALL_MODULES.length}
+                </span>
+                <span>{showModules ? '▲' : '▼'}</span>
+              </button>
+
+              {showModules && (
+                <div className={`mt-2 p-3 rounded-xl border space-y-3 ${theme.card}`}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {ALL_MODULES.map(m => (
+                      <label key={m.key} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={selectedModules.includes(m.key)}
+                          onChange={() => setSelectedModules(prev =>
+                            prev.includes(m.key) ? prev.filter(k => k !== m.key) : [...prev, m.key]
+                          )}
+                          className="rounded"
+                        />
+                        <span className={`text-xs ${theme.body}`}>{m.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Saved styles */}
+                  <div className={`border-t pt-2 ${theme.cardDivider}`}>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wide mb-1.5 ${theme.subtext}`}>Saved Styles</p>
+                    {reportStyles.length === 0 && (
+                      <p className={`text-xs ${theme.muted}`}>No saved styles yet.</p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {reportStyles.map(s => (
+                        <div key={s.id} className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleLoadStyle(s)}
+                            className={`text-xs px-2 py-0.5 rounded-full border ${theme.code} ${theme.body}`}
+                          >
+                            {s.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStyle(s.id)}
+                            className="text-[10px] text-red-400 hover:text-red-600"
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <form onSubmit={handleSaveStyle} className="flex items-center gap-1.5">
+                      <input
+                        value={saveStyleName}
+                        onChange={e => setSaveStyleName(e.target.value)}
+                        placeholder="Style name…"
+                        className={`text-xs rounded-lg border px-2 py-1 focus:outline-none flex-1 ${theme.input}`}
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingStyle || !saveStyleName.trim()}
+                        className={`text-xs px-2.5 py-1 rounded-lg ${theme.btnPrimary}`}
+                      >
+                        {savingStyle ? '…' : 'Save'}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Action buttons */}
             <div className="flex gap-2 flex-wrap">

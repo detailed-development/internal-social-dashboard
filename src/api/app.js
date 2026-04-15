@@ -10,6 +10,7 @@ import messagesRoutes from './routes/messages.js';
 import socialRoutes from './routes/social.js';
 import aiRoutes from './routes/ai.js';
 import contentPillarsRoutes from './routes/content-pillars.js';
+import reportStylesRoutes from './routes/report-styles.js';
 
 const app = express();
 
@@ -51,5 +52,6 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/content-pillars', contentPillarsRoutes);
+app.use('/api/report-styles', reportStylesRoutes);
 
 export default app;

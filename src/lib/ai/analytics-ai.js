@@ -199,7 +199,7 @@ export function assembleReportContext(overview) {
  *  - reportContext: structured analytics context (pre-AI snapshot)
  *  - chartData: structured data for frontend graph rendering
  */
-export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh = false }) {
+export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh = false, selectedModules = null }) {
   const now = new Date();
   const start = dateRangeStart || new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const end = dateRangeEnd || now.toISOString().split('T')[0];
@@ -222,6 +222,9 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
     dailyEngagement: promptText.dailyEngagement,
     topPosts: promptText.topPosts,
     postTypeBreakdown: promptText.postTypeBreakdown,
+    selectedModules: Array.isArray(selectedModules) && selectedModules.length > 0
+      ? selectedModules.join(', ')
+      : null,
   });
 
   const inputHash = hashInput({ clientSlug, start, end });

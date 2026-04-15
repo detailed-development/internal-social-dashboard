@@ -747,7 +747,7 @@ export default function ClientDetail() {
       )}
 
       {tab === 'AI Insights' && (
-        <WeeklyInsightsPanel clientSlug={slug} />
+        <WeeklyInsightsPanel clientSlug={slug} clientId={client.id} />
       )}
     </div>
   )

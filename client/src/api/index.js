@@ -31,11 +31,17 @@ export const assignPostToPillar = (pillarId, postId) => api.post(`/content-pilla
 export const unassignPostFromPillar = (pillarId, postId) => api.delete(`/content-pillars/${pillarId}/posts/${postId}`)
 export const getPillarAnalytics = (pillarId) => api.get(`/content-pillars/${pillarId}/analytics`).then(r => r.data)
 
+// Report Styles
+export const getReportStyles = (clientId) => api.get('/report-styles', { params: { clientId } }).then(r => r.data)
+export const createReportStyle = (data) => api.post('/report-styles', data).then(r => r.data)
+export const updateReportStyle = (id, data) => api.patch(`/report-styles/${id}`, data).then(r => r.data)
+export const deleteReportStyle = (id) => api.delete(`/report-styles/${id}`)
+
 // AI features
 export const generateWeeklyInsights = (params) => api.post('/ai/weekly-insights', params).then(r => r.data)
 export const generateCaption = (params) => api.post('/ai/caption-generator', params).then(r => r.data)
 export const extractHashtags = (params) => api.post('/ai/hashtag-extractor', params).then(r => r.data)
-export const generateReportDraft = (params) => api.post('/ai/report-draft', params).then(r => r.data)
+export const generateReportDraft = (params) => api.post('/ai/report-draft', params).then(r => r.data)  // params may include selectedModules: string[]
 export const rewriteContent = (params) => api.post('/ai/content-rewriter', params).then(r => r.data)
 export const checkAiGeneration = (params) => api.post('/ai/check', params).then(r => r.data)
 export const getCachedIntervals = (params) => api.get('/ai/cached-intervals', { params }).then(r => r.data)

@@ -275,12 +275,12 @@ router.post('/hashtag-extractor', async (req, res) => {
 // ─── Report Draft Generator ──────────────────────────────────────────────────
 
 router.post('/report-draft', async (req, res) => {
-  const { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh } = req.body;
+  const { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh, selectedModules } = req.body;
   if (!clientSlug) return res.status(400).json({ error: 'clientSlug is required', code: 'VALIDATION_ERROR' });
 
   try {
     const prisma = req.app.get('prisma');
-    const result = await generateReportDraft(prisma, { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh });
+    const result = await generateReportDraft(prisma, { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh, selectedModules });
     if (result.code === 'CLIENT_NOT_FOUND') return res.status(404).json(result);
     res.json(result);
   } catch (err) {
