@@ -30,9 +30,11 @@ export async function buildSocialOverviewFromReadModel(prisma, { clientId, windo
       take: 10,
     }),
     prisma.clientPostPerformance.groupBy({
-      by: ['mediaType'],
+      by: ['mediaType', 'platform'],
       where: { clientId, date: { gte: windowStart, lte: windowEnd } },
       _count: { _all: true },
+      _avg: { engagement: true },
+      _sum: { engagement: true },
     }),
   ]);
 
@@ -86,7 +88,13 @@ export async function buildSocialOverviewFromReadModel(prisma, { clientId, windo
   }));
 
   const postTypeBreakdown = mediaGroup
-    .map((g) => ({ type: g.mediaType, count: g._count._all }))
+    .map((g) => ({
+      type: g.mediaType,
+      platform: g.platform,
+      count: g._count._all,
+      avgEngagement: Math.round(g._avg.engagement ?? 0),
+      totalEngagement: g._sum.engagement ?? 0,
+    }))
     .sort((a, b) => b.count - a.count);
 
   return {
@@ -167,15 +175,26 @@ export async function buildSocialOverviewFromRaw(prisma, { clientId, windowStart
     }
   }
 
-  const typeCount = {};
-  for (const p of allPosts) typeCount[p.mediaType] = (typeCount[p.mediaType] || 0) + 1;
+  const typeMap = {};
+  for (const p of allPosts) {
+    const key = `${p.platform}|${p.mediaType}`;
+    if (!typeMap[key]) typeMap[key] = { type: p.mediaType, platform: p.platform, count: 0, totalEngagement: 0 };
+    typeMap[key].count++;
+    typeMap[key].totalEngagement += p.engagement;
+  }
 
   return {
     platformTotals,
     dailyEngagement: [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
     topPosts: allPosts.sort((a, b) => b.engagement - a.engagement).slice(0, 10),
-    postTypeBreakdown: Object.entries(typeCount)
-      .map(([type, count]) => ({ type, count }))
+    postTypeBreakdown: Object.values(typeMap)
+      .map((t) => ({
+        type: t.type,
+        platform: t.platform,
+        count: t.count,
+        avgEngagement: t.count > 0 ? Math.round(t.totalEngagement / t.count) : 0,
+        totalEngagement: t.totalEngagement,
+      }))
       .sort((a, b) => b.count - a.count),
   };
 }

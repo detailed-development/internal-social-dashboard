@@ -63,6 +63,7 @@ enum TokenStatus {
 
 enum MediaType {
   POST
+  CAROUSEL
   REEL
   STORY
   VIDEO

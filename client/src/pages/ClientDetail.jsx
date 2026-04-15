@@ -8,6 +8,7 @@ import {
 import StatCard from '../components/StatCard'
 import PostCard from '../components/PostCard'
 import EngagementChart from '../components/EngagementChart'
+import PostTypeBreakdownChart from '../components/PostTypeBreakdownChart'
 import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
 import MessagesSection from '../components/MessagesSection'
@@ -594,6 +595,12 @@ export default function ClientDetail() {
             <div className={`border rounded-xl p-5 mb-8 ${theme.card}`}>
               <h3 className={`text-sm font-semibold mb-4 ${theme.body}`}>Engagement by Account</h3>
               <EngagementChart data={chartData} />
+            </div>
+          )}
+
+          {overview?.chartData?.postTypeBreakdown?.length > 0 && (
+            <div className={`border rounded-xl p-5 mb-8 ${theme.card}`}>
+              <PostTypeBreakdownChart postTypeBreakdown={overview.chartData.postTypeBreakdown} />
             </div>
           )}
 

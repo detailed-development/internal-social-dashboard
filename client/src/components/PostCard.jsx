@@ -8,7 +8,7 @@ function fmt(n) {
   return String(n)
 }
 
-const MEDIA_LABELS = { REEL: 'Reel', VIDEO: 'Video', SHORT: 'Short' }
+const MEDIA_LABELS = { CAROUSEL: 'Carousel', REEL: 'Reel', VIDEO: 'Video', SHORT: 'Short' }
 
 export default function PostCard({ post, platform }) {
   const { theme } = useTheme()
