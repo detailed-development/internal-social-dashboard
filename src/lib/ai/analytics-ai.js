@@ -101,17 +101,103 @@ export async function generateWeeklyInsights(prisma, { clientSlug, dateRangeStar
 }
 
 /**
+ * Assembles a structured analytics context from a buildClientOverview() result.
+ *
+ * Separates deterministic analytics processing from AI generation so:
+ *  - the structured snapshot can be shown in the UI before generation
+ *  - the AI receives richer, cleaner formatted inputs
+ *
+ * Returns { structured, promptText } where:
+ *  - structured: display-ready analytics object (safe to expose to frontend)
+ *  - promptText: { dailyEngagement, topPosts, postTypeBreakdown } — formatted for AI prompt
+ */
+export function assembleReportContext(overview) {
+  const cd = overview.chartData || {};
+  const summary = overview.summary || {};
+
+  // Structured context: display-ready analytics
+  const structured = {
+    clientName: overview.client?.name,
+    dateRange: { start: overview.range?.start, end: overview.range?.end },
+    socialSummary: {
+      totalEngagement: summary.totalEngagement ?? 0,
+      totalReach: summary.totalReach ?? 0,
+      totalPosts: summary.totalPosts ?? 0,
+      platforms: (cd.platformTotals || []).map(p => ({
+        platform: p.platform,
+        handle: p.handle,
+        followers: p.followers,
+        likes: p.likes,
+        comments: p.comments,
+        shares: p.shares,
+        saves: p.saves,
+        reach: p.reach,
+      })),
+      topPostCount: (cd.topPosts || []).length,
+      postTypeBreakdown: (cd.postTypeBreakdown || []).reduce((acc, t) => {
+        acc[t.type] = (acc[t.type] || 0) + t.count;
+        return acc;
+      }, {}),
+    },
+    webSummary: overview.web
+      ? {
+          sessions: overview.web.totals?.sessions ?? 0,
+          users: overview.web.totals?.users ?? 0,
+          pageviews: overview.web.totals?.pageviews ?? 0,
+          topSource: overview.web.sources?.[0]?.source ?? null,
+        }
+      : null,
+    insights: (overview.ruleInsights || []).slice(0, 5).map(i => ({
+      type: i.type,
+      message: i.message,
+    })),
+    freshnessState: overview.freshness
+      ? {
+          social: overview.freshness.socialLastSyncedAt,
+          web: overview.freshness.webAnalyticsLastSyncedAt,
+        }
+      : null,
+  };
+
+  // Formatted text blocks for AI prompt
+  let dailyEngagementText = '';
+  if (cd.dailyEngagement?.length > 0) {
+    dailyEngagementText = 'Daily social engagement:\n';
+    for (const d of cd.dailyEngagement.slice(-14)) {
+      const parts = [`  ${d.date}:`];
+      for (const key of Object.keys(d)) {
+        if (key !== 'date') parts.push(`${key}=${d[key]}`);
+      }
+      dailyEngagementText += parts.join(' ') + '\n';
+    }
+  }
+
+  let topPostsText = '';
+  if (cd.topPosts?.length > 0) {
+    topPostsText = 'Top 10 posts by engagement:\n';
+    for (const p of cd.topPosts) {
+      topPostsText += `  - [${p.platform}/${p.mediaType}] "${(p.caption || '').slice(0, 60)}..." — ${p.likes} likes, ${p.comments} comments, ${p.shares} shares, ${p.reach} reach\n`;
+    }
+  }
+
+  let postTypeText = '';
+  if (cd.postTypeBreakdown?.length > 0) {
+    postTypeText = 'Post type distribution: ' + cd.postTypeBreakdown.map(t => `${t.type}: ${t.count}`).join(', ');
+  }
+
+  return {
+    structured,
+    promptText: { dailyEngagement: dailyEngagementText, topPosts: topPostsText, postTypeBreakdown: postTypeText },
+  };
+}
+
+/**
  * Generate a comprehensive client-facing report draft with graph data.
  *
  * Returns:
  *  - report: markdown narrative
+ *  - reportContext: structured analytics context (pre-AI snapshot)
  *  - chartData: structured data for frontend graph rendering
- *    - dailyEngagement: time-series by platform (likes, comments, reach, impressions)
- *    - platformTotals: per-platform aggregate metrics
- *    - topPosts: ranked by engagement score
- *    - postTypeBreakdown: media type distribution
- *    - dailyTraffic: GA4 sessions/users/pageviews per day
- *    - trafficSources: top referral sources
  */
 export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, dateRangeEnd, forceRefresh = false }) {
   const now = new Date();
@@ -124,34 +210,7 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
   if (!overview) return { error: 'Client not found', code: 'CLIENT_NOT_FOUND' };
 
   const cd = overview.chartData;
-
-  // Build a compact daily-engagement table for the prompt so the AI can reference trends
-  let dailyEngagementText = '';
-  if (cd.dailyEngagement.length > 0) {
-    dailyEngagementText = 'Daily social engagement:\n';
-    for (const d of cd.dailyEngagement.slice(-14)) {
-      const parts = [`  ${d.date}:`];
-      for (const key of Object.keys(d)) {
-        if (key !== 'date') parts.push(`${key}=${d[key]}`);
-      }
-      dailyEngagementText += parts.join(' ') + '\n';
-    }
-  }
-
-  // Build top posts table
-  let topPostsText = '';
-  if (cd.topPosts.length > 0) {
-    topPostsText = 'Top 10 posts by engagement:\n';
-    for (const p of cd.topPosts) {
-      topPostsText += `  - [${p.platform}/${p.mediaType}] "${(p.caption || '').slice(0, 60)}..." — ${p.likes} likes, ${p.comments} comments, ${p.shares} shares, ${p.reach} reach\n`;
-    }
-  }
-
-  // Build post type breakdown
-  let postTypeText = '';
-  if (cd.postTypeBreakdown.length > 0) {
-    postTypeText = 'Post type distribution: ' + cd.postTypeBreakdown.map(t => `${t.type}: ${t.count}`).join(', ');
-  }
+  const { structured: reportContext, promptText } = assembleReportContext(overview);
 
   const { systemMessage, userMessage, version } = renderTemplate('report-draft', {
     clientName: overview.client.name,
@@ -160,9 +219,9 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
     socialData: overview.promptContext.socialData || 'No social data available for this period.',
     webData: overview.promptContext.webData,
     buzzwords: overview.promptContext.buzzwords,
-    dailyEngagement: dailyEngagementText,
-    topPosts: topPostsText,
-    postTypeBreakdown: postTypeText,
+    dailyEngagement: promptText.dailyEngagement,
+    topPosts: promptText.topPosts,
+    postTypeBreakdown: promptText.postTypeBreakdown,
   });
 
   const inputHash = hashInput({ clientSlug, start, end });
@@ -181,6 +240,7 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
     if (cached) {
       return {
         report: cached.responseBody,
+        reportContext,
         chartData: cd,
         cached: true,
         usage: { promptTokens: cached.promptTokens, completionTokens: cached.completionTokens, totalTokens: cached.totalTokens },
@@ -225,6 +285,7 @@ export async function generateReportDraft(prisma, { clientSlug, dateRangeStart, 
 
   return {
     report: result.content,
+    reportContext,
     chartData: cd,
     cached: false,
     usage: result.usage,
