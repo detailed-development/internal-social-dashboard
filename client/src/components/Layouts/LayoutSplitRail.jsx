@@ -312,7 +312,7 @@ export default function Layout() {
       </aside>
 
       <aside
-        className={`hidden md:flex flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${minimized ? 'w-16' : 'w-80'} ${sidebarBgClass}`}
+        className={`hidden md:flex flex-shrink-0 overflow-x-hidden transition-all duration-300 ease-in-out ${minimized ? 'w-16' : 'w-80'} ${sidebarBgClass}`}
         style={sidebarStyle}
       >
         {renderSidebar(false)}
