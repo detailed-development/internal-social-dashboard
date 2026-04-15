@@ -31,6 +31,10 @@ export const assignPostToPillar = (pillarId, postId) => api.post(`/content-pilla
 export const unassignPostFromPillar = (pillarId, postId) => api.delete(`/content-pillars/${pillarId}/posts/${postId}`)
 export const getPillarAnalytics = (pillarId) => api.get(`/content-pillars/${pillarId}/analytics`).then(r => r.data)
 
+// Style Guide
+export const getStyleGuide = (slug) => api.get(`/clients/${slug}/style-guide`).then(r => r.data)
+export const updateStyleGuide = (slug, data) => api.put(`/clients/${slug}/style-guide`, data).then(r => r.data)
+
 // Report Styles
 export const getReportStyles = (clientId) => api.get('/report-styles', { params: { clientId } }).then(r => r.data)
 export const createReportStyle = (data) => api.post('/report-styles', data).then(r => r.data)

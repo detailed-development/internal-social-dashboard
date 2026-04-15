@@ -134,4 +134,35 @@ router.patch('/:slug', async (req, res) => {
   }
 });
 
+// ─── Style Guide ─────────────────────────────────────────────────────────────
+
+router.get('/:slug/style-guide', async (req, res) => {
+  const prisma = req.app.get('prisma');
+  try {
+    const client = await prisma.client.findUnique({ where: { slug: req.params.slug }, select: { id: true } });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    const guide = await prisma.clientStyleGuide.findUnique({ where: { clientId: client.id } });
+    res.json(guide || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:slug/style-guide', async (req, res) => {
+  const prisma = req.app.get('prisma');
+  const { fonts, primaryColors, secondaryColors, toneOfVoice, brandGuidelines, dos, donts, promptMarkdown } = req.body;
+  try {
+    const client = await prisma.client.findUnique({ where: { slug: req.params.slug }, select: { id: true } });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    const guide = await prisma.clientStyleGuide.upsert({
+      where: { clientId: client.id },
+      create: { clientId: client.id, fonts, primaryColors, secondaryColors, toneOfVoice, brandGuidelines, dos, donts, promptMarkdown },
+      update: { fonts, primaryColors, secondaryColors, toneOfVoice, brandGuidelines, dos, donts, promptMarkdown },
+    });
+    res.json(guide);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

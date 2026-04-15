@@ -44,6 +44,7 @@ model Client {
   reportInputSnapshots ClientReportInputSnapshot[]
   contentPillars       ContentPillar[]
   reportStyles         ClientReportStyle[]
+  styleGuide           ClientStyleGuide?
 
   @@map("clients")
 }
@@ -436,6 +437,24 @@ model ClientReportStyle {
 
   @@index([clientId])
   @@map("client_report_styles")
+}
+
+model ClientStyleGuide {
+  id              String   @id @default(cuid())
+  clientId        String   @unique @map("client_id")
+  fonts           String?
+  primaryColors   Json?    @map("primary_colors")
+  secondaryColors Json?    @map("secondary_colors")
+  toneOfVoice     String?  @map("tone_of_voice")
+  brandGuidelines String?  @map("brand_guidelines")
+  dos             Json?
+  donts           Json?
+  promptMarkdown  String?  @map("prompt_markdown")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_style_guides")
 }
 
 model ContentPillar {

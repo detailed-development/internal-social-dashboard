@@ -15,6 +15,7 @@ import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
 import MessagesSection from '../components/MessagesSection'
 import WeeklyInsightsPanel from '../components/ai/WeeklyInsightsPanel'
+import StyleGuidePanel from '../components/StyleGuidePanel'
 import RuleInsightsPanel from '../components/analytics/RuleInsightsPanel'
 import FreshnessBadges from '../components/analytics/FreshnessBadges'
 import { useTheme } from '../ThemeContext'
@@ -99,7 +100,7 @@ export default function ClientDetail() {
         setShowSocial(hasSocial)
         const stored = savedTab(slug)
         const defaultTab = hasSocial ? 'Social' : 'Website Analytics'
-        const validTabs = ['Social', 'Messages', 'Website Analytics']
+        const validTabs = ['Social', 'Messages', 'Website Analytics', 'AI Insights', 'Style Guide']
         const resolvedTab = stored && validTabs.includes(stored) && (stored === 'Social' ? hasSocial : true) ? stored : defaultTab
         setTab(resolvedTab)
 
@@ -289,6 +290,7 @@ export default function ClientDetail() {
     ...(hasMessagingAccounts ? ['Messages'] : []),
     'Website Analytics',
     'AI Insights',
+    'Style Guide',
   ]
 
   return (
@@ -748,6 +750,10 @@ export default function ClientDetail() {
 
       {tab === 'AI Insights' && (
         <WeeklyInsightsPanel clientSlug={slug} clientId={client.id} />
+      )}
+
+      {tab === 'Style Guide' && (
+        <StyleGuidePanel clientSlug={slug} />
       )}
     </div>
   )
