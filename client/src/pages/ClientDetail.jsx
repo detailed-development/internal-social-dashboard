@@ -42,7 +42,8 @@ export default function ClientDetail() {
     try { return localStorage.getItem(`ncm_tab_${slug}`) } catch { return null }
   }
 
-  // GA4 editing state
+  // GA4 modal + editing state
+  const [ga4ModalOpen, setGa4ModalOpen] = useState(false)
   const [isEditingGa, setIsEditingGa] = useState(false)
   const [gaPropertyIdInput, setGaPropertyIdInput] = useState('')
   const [websiteUrlInput, setWebsiteUrlInput] = useState('')
@@ -192,6 +193,7 @@ export default function ClientDetail() {
       })
       setClient(updated)
       setIsEditingGa(false)
+      setGa4ModalOpen(false)
     } catch (err) {
       setSaveError(err?.response?.data?.error || 'Failed to save GA4 details.')
     } finally {
@@ -300,9 +302,14 @@ export default function ClientDetail() {
               {client.socialAccounts.map(a => (
                 <PlatformBadge key={a.id} platform={a.platform} />
               ))}
-              {client.gaPropertyId && (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${theme.ga4Badge}`}>GA4</span>
-              )}
+              <button
+                type="button"
+                onClick={() => setGa4ModalOpen(true)}
+                className={`text-xs font-medium px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity ${client.gaPropertyId ? theme.ga4Badge : 'bg-gray-100 text-gray-400 border border-gray-200'}`}
+                title={client.gaPropertyId ? `GA4: ${client.gaPropertyId}` : 'Link GA4 property'}
+              >
+                GA4
+              </button>
             </div>
           </div>
         </div>
@@ -420,118 +427,134 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* GA4 Card */}
-      <div className={`mb-6 rounded-xl border p-4 ${theme.card}`}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className={`text-xs uppercase tracking-[0.2em] ${theme.muted}`}>GA4 connection</p>
-            <p className={`text-sm ${theme.body}`}>
-              {client.gaPropertyId ? (
-                <>Property ID <span className={`font-semibold ${theme.heading}`}>{client.gaPropertyId}</span></>
-              ) : (
-                <>No GA4 property linked yet.</>
-              )}
-            </p>
-            {client.websiteUrl && (
-              <p className={`text-xs mt-1 ${theme.muted}`}>Website: {client.websiteUrl}</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={handleOpenGaEdit}
-            className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition ${theme.gaEditBtn}`}
-          >
-            {client.gaPropertyId ? 'Edit GA4 link' : 'Link GA4 property'}
-          </button>
-        </div>
-
-        {isEditingGa && (
-          <div className="mt-4 space-y-4">
-            {loadingProperties && (
-              <div className={`text-xs italic ${theme.muted}`}>Loading GA4 properties...</div>
-            )}
-            {propertiesError && (
-              <div className="text-xs text-red-500">{propertiesError}</div>
-            )}
-            {ga4Properties.length > 0 && !loadingProperties && (
-              <div>
-                <p className={`text-xs font-semibold uppercase tracking-[0.18em] mb-2 ${theme.subtext}`}>Available GA4 Properties</p>
-                <div className="grid gap-2 mb-4">
-                  {ga4Properties.map(prop => (
-                    <button
-                      key={prop.id}
-                      type="button"
-                      onClick={() => handleSelectProperty(prop)}
-                      className={`w-full text-left rounded-lg border p-3 transition ${theme.gaPropertyBtn}`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="min-w-0 flex-1">
-                          <p className={`line-clamp-1 text-sm font-medium ${theme.heading}`}>{prop.displayName}</p>
-                          <p className={`text-xs ${theme.muted}`}>ID: {prop.id}</p>
-                          {prop.websiteUrl && (
-                            <p className={`text-xs line-clamp-1 ${theme.muted}`}>{prop.websiteUrl}</p>
-                          )}
-                        </div>
-                        <input
-                          type="radio"
-                          checked={gaPropertyIdInput === prop.id}
-                          onChange={() => {}}
-                          className="mt-0.5 h-4 w-4 flex-shrink-0"
-                        />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className={`block text-sm ${theme.body}`}>
-                <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>GA4 Property ID</span>
-                <input
-                  value={gaPropertyIdInput}
-                  onChange={e => setGaPropertyIdInput(e.target.value)}
-                  placeholder="398788290"
-                  className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
-                />
-              </label>
-              <label className={`block text-sm ${theme.body}`}>
-                <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>Website URL</span>
-                <input
-                  value={websiteUrlInput}
-                  onChange={e => setWebsiteUrlInput(e.target.value)}
-                  placeholder="https://example.com"
-                  className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
-                />
-              </label>
-              <div className="sm:col-span-2 flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveGaLink}
-                    disabled={savingGa}
-                    className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition ${theme.btnPrimary}`}
-                  >
-                    {savingGa ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingGa(false)
-                      setSaveError('')
-                      setGaPropertyIdInput(client.gaPropertyId || '')
-                      setWebsiteUrlInput(client.websiteUrl || '')
-                    }}
-                    className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition ${theme.btnCancel}`}
-                  >
-                    Cancel
-                  </button>
-                </div>
-                {saveError && <p className="text-sm text-red-500">{saveError}</p>}
-              </div>
+      {/* GA4 Modal */}
+      {ga4ModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => { setGa4ModalOpen(false); setIsEditingGa(false); setSaveError('') }}
+          />
+          <div className={`relative w-full max-w-md rounded-2xl border p-6 shadow-xl ${theme.card}`}>
+            <div className="flex items-center justify-between mb-4">
+              <p className={`text-sm font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>GA4 Connection</p>
+              <button
+                type="button"
+                onClick={() => { setGa4ModalOpen(false); setIsEditingGa(false); setSaveError('') }}
+                className={`p-1 rounded-lg transition-colors ${theme.navItemInactive}`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
+
+            <div className="mb-4">
+              <p className={`text-sm ${theme.body}`}>
+                {client.gaPropertyId ? (
+                  <>Property ID <span className={`font-semibold ${theme.heading}`}>{client.gaPropertyId}</span></>
+                ) : (
+                  <span className={theme.muted}>No GA4 property linked yet.</span>
+                )}
+              </p>
+              {client.websiteUrl && (
+                <p className={`text-xs mt-1 ${theme.muted}`}>Website: {client.websiteUrl}</p>
+              )}
+            </div>
+
+            {!isEditingGa && (
+              <button
+                type="button"
+                onClick={handleOpenGaEdit}
+                className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition ${theme.gaEditBtn}`}
+              >
+                {client.gaPropertyId ? 'Edit GA4 link' : 'Link GA4 property'}
+              </button>
+            )}
+
+            {isEditingGa && (
+              <div className="space-y-4">
+                {loadingProperties && (
+                  <div className={`text-xs italic ${theme.muted}`}>Loading GA4 properties...</div>
+                )}
+                {propertiesError && (
+                  <div className="text-xs text-red-500">{propertiesError}</div>
+                )}
+                {ga4Properties.length > 0 && !loadingProperties && (
+                  <div>
+                    <p className={`text-xs font-semibold uppercase tracking-[0.18em] mb-2 ${theme.subtext}`}>Available GA4 Properties</p>
+                    <div className="grid gap-2 mb-4 max-h-48 overflow-y-auto">
+                      {ga4Properties.map(prop => (
+                        <button
+                          key={prop.id}
+                          type="button"
+                          onClick={() => handleSelectProperty(prop)}
+                          className={`w-full text-left rounded-lg border p-3 transition ${theme.gaPropertyBtn}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className={`line-clamp-1 text-sm font-medium ${theme.heading}`}>{prop.displayName}</p>
+                              <p className={`text-xs ${theme.muted}`}>ID: {prop.id}</p>
+                              {prop.websiteUrl && (
+                                <p className={`text-xs line-clamp-1 ${theme.muted}`}>{prop.websiteUrl}</p>
+                              )}
+                            </div>
+                            <input
+                              type="radio"
+                              checked={gaPropertyIdInput === prop.id}
+                              onChange={() => {}}
+                              className="mt-0.5 h-4 w-4 flex-shrink-0"
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className={`block text-sm ${theme.body}`}>
+                    <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>GA4 Property ID</span>
+                    <input
+                      value={gaPropertyIdInput}
+                      onChange={e => setGaPropertyIdInput(e.target.value)}
+                      placeholder="398788290"
+                      className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
+                    />
+                  </label>
+                  <label className={`block text-sm ${theme.body}`}>
+                    <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${theme.subtext}`}>Website URL</span>
+                    <input
+                      value={websiteUrlInput}
+                      onChange={e => setWebsiteUrlInput(e.target.value)}
+                      placeholder="https://example.com"
+                      className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${theme.input}`}
+                    />
+                  </label>
+                  <div className="sm:col-span-2 flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveGaLink}
+                        disabled={savingGa}
+                        className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition ${theme.btnPrimary}`}
+                      >
+                        {savingGa ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsEditingGa(false); setSaveError(''); setGaPropertyIdInput(client.gaPropertyId || ''); setWebsiteUrlInput(client.websiteUrl || '') }}
+                        className={`inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition ${theme.btnCancel}`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {saveError && <p className="text-sm text-red-500">{saveError}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Global freshness bar */}
       <FreshnessBadges freshness={overview?.freshness} variant="compact" />
