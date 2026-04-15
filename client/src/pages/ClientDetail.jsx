@@ -286,17 +286,17 @@ export default function ClientDetail() {
   return (
     <div className="p-4 sm:p-8">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
             style={{ backgroundColor: client.avatarColor || '#6366f1' }}
           >
             {client.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className={`text-2xl font-bold ${theme.heading}`}>{client.name}</h2>
-            <div className="flex gap-2 mt-1">
+            <h2 className={`text-xl font-bold leading-tight ${theme.heading}`}>{client.name}</h2>
+            <div className="flex gap-1.5 mt-0.5">
               {client.socialAccounts.map(a => (
                 <PlatformBadge key={a.id} platform={a.platform} />
               ))}
