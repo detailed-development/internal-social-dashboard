@@ -349,20 +349,20 @@ export const THEMES = {
       fresh: {
         pill: 'ncm-darkmode-bg-green ncm-darkmode-green-text border-emerald-400/35',
         card: 'border-emerald-500/45',
-        dot: 'ncm-darkmode-green-text',
-        bar: 'ncm-darkmode-green-text',
+        dot: 'ncm-darkmode-green-bar',
+        bar: 'ncm-darkmode-green-bar',
       },
       aging: {
         pill: 'bg-amber-500/15 ncm-darkmode-yellow-text border-amber-400/35',
         card: 'border-amber-500/45',
-        dot: 'ncm-darkmode-yellow-text',
-        bar: 'ncm-darkmode-yellow-text',
+        dot: 'ncm-darkmode-yellow-bar',
+        bar: 'ncm-darkmode-yellow-bar',
       },
       stale: {
         pill: 'bg-red-500/15 ncm-darkmode-red-text border-red-400/35',
         card: 'border-red-500/45',
-        dot: 'ncm-darkmode-red-text',
-        bar: 'ncm-darkmode-red-text',
+        dot: 'ncm-darkmode-red-bar',
+        bar: 'ncm-darkmode-red-bar',
       },
       unknown: {
         pill: 'bg-gray-800 text-gray-200 border-gray-600',
