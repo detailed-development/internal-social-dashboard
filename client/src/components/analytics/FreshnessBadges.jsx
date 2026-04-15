@@ -81,7 +81,17 @@ function StatusCard({ title, primaryLabel, primaryValue, details = [], theme, cl
   )
 }
 
-export default function FreshnessBadges({ freshness }) {
+function CompactPill({ label, value, state, theme }) {
+  const tone = getStatusTone(theme, state)
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${tone.pill}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${tone.dot}`} />
+      {label}{value ? ` · ${value}` : ''}
+    </span>
+  )
+}
+
+export default function FreshnessBadges({ freshness, variant = 'full' }) {
   const { theme } = useTheme()
   if (!freshness) return null
 
@@ -95,6 +105,37 @@ export default function FreshnessBadges({ freshness }) {
   const transcriptionState =
     transcriptionPct == null ? 'unknown' : transcriptionPct >= 80 ? 'fresh' : transcriptionPct >= 40 ? 'aging' : 'stale'
   const transcriptionTone = getStatusTone(theme, transcriptionState)
+
+  if (variant === 'compact') {
+    return (
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <CompactPill
+          label="Social"
+          value={socialChecked ? timeAgo(socialChecked) : null}
+          state={socialChecked ? staleness(socialChecked) : 'unknown'}
+          theme={theme}
+        />
+        <CompactPill
+          label="Messages"
+          value={messagesChecked ? timeAgo(messagesChecked) : null}
+          state={messagesChecked ? staleness(messagesChecked) : 'unknown'}
+          theme={theme}
+        />
+        <CompactPill
+          label="Website"
+          value={webLatest ? timeAgo(webLatest) : null}
+          state={webLatest ? staleness(webLatest) : 'unknown'}
+          theme={theme}
+        />
+        <CompactPill
+          label="Transcribed"
+          value={transcriptionPct != null ? `${transcriptionPct}%` : null}
+          state={transcriptionState}
+          theme={theme}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="mb-4">

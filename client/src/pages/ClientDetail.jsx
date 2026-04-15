@@ -533,6 +533,9 @@ export default function ClientDetail() {
         )}
       </div>
 
+      {/* Global freshness bar */}
+      <FreshnessBadges freshness={overview?.freshness} variant="compact" />
+
       {/* Tabs */}
       <div className={`flex gap-1 mb-6 border-b overflow-x-auto ${theme.tabsBar}`}>
         {visibleTabs.map(t => (
