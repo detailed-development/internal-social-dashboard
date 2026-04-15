@@ -52,3 +52,12 @@
   transform: scale(1.08);
   box-shadow: 0 2px 8px rgba(132, 204, 22, 0.35);
 }
+
+
+.ncm-orange {
+  background-color: rgb(284 98 92 / var(--tw-bg-opacity, 1));
+  color: white;
+}
+.border-ncm-orange {
+  border-color: rgb(284 98 92 / var(--tw-border-opacity, .8));
+}

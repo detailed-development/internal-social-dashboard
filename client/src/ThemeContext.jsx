@@ -89,10 +89,10 @@ export const THEMES = {
         bar: 'bg-emerald-500',
       },
       aging: {
-        pill: 'bg-amber-500 text-white border-amber-500',
+        pill: 'ncm-orange text-white border-ncm-orange',
         card: 'border-amber-300',
         dot: 'bg-white/90',
-        bar: 'bg-amber-500',
+        bar: 'ncm-orange',
       },
       stale: {
         pill: 'bg-red-600 text-white border-red-600',
