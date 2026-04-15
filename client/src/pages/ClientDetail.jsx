@@ -10,6 +10,7 @@ import PostCard from '../components/PostCard'
 import EngagementChart from '../components/EngagementChart'
 import PostTypeBreakdownChart from '../components/PostTypeBreakdownChart'
 import EngagementTrendChart from '../components/EngagementTrendChart'
+import ContentPillarsPanel from '../components/ContentPillarsPanel'
 import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
 import MessagesSection from '../components/MessagesSection'
@@ -57,6 +58,9 @@ export default function ClientDetail() {
 
   // Platform collapse state
   const [collapsedPlatforms, setCollapsedPlatforms] = useState({})
+
+  // Content pillar filter
+  const [pillarFilter, setPillarFilter] = useState(null)
 
   // Settings panel state
   const [showSettings, setShowSettings] = useState(false)
@@ -583,6 +587,13 @@ export default function ClientDetail() {
           <FreshnessBadges freshness={overview?.freshness} />
           <RuleInsightsPanel ruleInsights={overview?.ruleInsights} />
 
+          {/* Content Pillars */}
+          <ContentPillarsPanel
+            clientId={client.id}
+            posts={allPosts}
+            onFilterChange={setPillarFilter}
+          />
+
           {/* Overall stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-8">
             <StatCard label="Followers"       value={fmt(totalFollowers)} />
@@ -693,16 +704,23 @@ export default function ClientDetail() {
                       ))}
 
                       {/* Platform posts */}
-                      {platformPosts.length > 0 && (
-                        <>
-                          <h4 className={`text-xs font-semibold uppercase tracking-wider ${theme.muted}`}>Recent Posts</h4>
-                          <div className="space-y-3">
-                            {platformPosts.slice(0, 4).map(post => (
-                              <PostCard key={post.id} post={post} platform={post.platform} />
-                            ))}
-                          </div>
-                        </>
-                      )}
+                      {platformPosts.length > 0 && (() => {
+                        const filteredPosts = pillarFilter
+                          ? platformPosts.filter(p => p.pillars?.some(pa => pa.contentPillarId === pillarFilter))
+                          : platformPosts
+                        return filteredPosts.length > 0 ? (
+                          <>
+                            <h4 className={`text-xs font-semibold uppercase tracking-wider ${theme.muted}`}>
+                              Recent Posts{pillarFilter ? ' (filtered by pillar)' : ''}
+                            </h4>
+                            <div className="space-y-3">
+                              {filteredPosts.slice(0, 4).map(post => (
+                                <PostCard key={post.id} post={post} platform={post.platform} />
+                              ))}
+                            </div>
+                          </>
+                        ) : null
+                      })()}
                     </div>
                   )}
                 </div>

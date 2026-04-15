@@ -97,6 +97,7 @@ router.get('/:slug', async (req, res) => {
                 metrics: { orderBy: { recordedAt: 'desc' }, take: 1 },
                 comments: { orderBy: { postedAt: 'desc' }, take: 5 },
                 transcription: true,
+                pillars: { select: { contentPillarId: true } },
               },
             },
           },

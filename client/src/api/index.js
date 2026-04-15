@@ -22,6 +22,15 @@ export const getMessages = (slug, { limit, includeHidden } = {}) =>
 export const hideConversation = (id, hidden) => api.patch(`/messages/conversations/${id}/hide`, { hidden }).then(r => r.data)
 export const lookupSocialHandle = (platform, handle) => api.get('/social/lookup', { params: { platform, handle } }).then(r => r.data)
 
+// Content Pillars
+export const getContentPillars = (clientId) => api.get('/content-pillars', { params: { clientId } }).then(r => r.data)
+export const createContentPillar = (data) => api.post('/content-pillars', data).then(r => r.data)
+export const updateContentPillar = (id, data) => api.patch(`/content-pillars/${id}`, data).then(r => r.data)
+export const deleteContentPillar = (id) => api.delete(`/content-pillars/${id}`)
+export const assignPostToPillar = (pillarId, postId) => api.post(`/content-pillars/${pillarId}/posts/${postId}`)
+export const unassignPostFromPillar = (pillarId, postId) => api.delete(`/content-pillars/${pillarId}/posts/${postId}`)
+export const getPillarAnalytics = (pillarId) => api.get(`/content-pillars/${pillarId}/analytics`).then(r => r.data)
+
 // AI features
 export const generateWeeklyInsights = (params) => api.post('/ai/weekly-insights', params).then(r => r.data)
 export const generateCaption = (params) => api.post('/ai/caption-generator', params).then(r => r.data)

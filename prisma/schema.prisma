@@ -42,6 +42,7 @@ model Client {
   pageDaily            ClientPageDaily[]
   buzzwordDaily        ClientBuzzwordDaily[]
   reportInputSnapshots ClientReportInputSnapshot[]
+  contentPillars       ContentPillar[]
 
   @@map("clients")
 }
@@ -104,10 +105,11 @@ model Post {
   thumbnailUrl    String?        @map("thumbnail_url")
   publishedAt     DateTime       @map("published_at")
   fetchedAt       DateTime       @default(now()) @map("fetched_at")
-  socialAccount   SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  socialAccount   SocialAccount     @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
   metrics         PostMetric[]
   comments        Comment[]
   transcription   Transcription?
+  pillars         PostContentPillar[]
 
   @@unique([socialAccountId, platformPostId])
   @@index([socialAccountId, publishedAt(sort: Desc)])
@@ -419,6 +421,31 @@ model ClientBuzzwordDaily {
   @@index([clientId, date])
   @@index([clientId, word, date])
   @@map("client_buzzword_daily")
+}
+
+model ContentPillar {
+  id          String              @id @default(cuid())
+  clientId    String              @map("client_id")
+  name        String
+  description String?
+  color       String?
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  client      Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  posts       PostContentPillar[]
+
+  @@index([clientId])
+  @@map("content_pillars")
+}
+
+model PostContentPillar {
+  postId          String        @map("post_id")
+  contentPillarId String        @map("content_pillar_id")
+  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  contentPillar   ContentPillar @relation(fields: [contentPillarId], references: [id], onDelete: Cascade)
+
+  @@id([postId, contentPillarId])
+  @@map("post_content_pillars")
 }
 
 /// Optional observability: stores the prompt-input JSON used for a given
