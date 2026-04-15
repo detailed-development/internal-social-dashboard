@@ -219,6 +219,88 @@ export default function WeeklyInsightsPanel({ clientSlug, clientId }) {
     navigator.clipboard.writeText(report.report)
   }
 
+  function exportReportHtml() {
+    const isInsights = activeView === 'insights'
+    const content = isInsights ? insights?.insights : report?.report
+    if (!content) return
+
+    const clientName = report?.reportContext?.clientName || clientSlug
+    const dateRange = `${fmtDisplayDate(dateStart)} – ${fmtDisplayDate(dateEnd)}`
+    const title = isInsights ? 'Quick Insights' : 'Full Report'
+    const generatedDate = report?.generatedAt
+      ? new Date(report.generatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+
+    // Parse markdown sections (mirrors NarrativeSections logic)
+    const sections = []
+    const lines = content.split('\n')
+    let current = null
+    for (const line of lines) {
+      const h3Match = line.match(/^###\s+(.+)/)
+      const h2Match = line.match(/^##\s+(.+)/)
+      const h1Match = line.match(/^#\s+(.+)/)
+      if (h3Match || h2Match || h1Match) {
+        if (current) sections.push(current)
+        const sTitle = (h3Match || h2Match || h1Match)[1]
+        current = { title: sTitle, body: '', level: h3Match ? 3 : h2Match ? 2 : 1 }
+      } else if (current) {
+        current.body += line + '\n'
+      } else if (line.trim()) {
+        if (!sections.length) sections.push({ title: null, body: '', level: 0 })
+        sections[0].body += line + '\n'
+      }
+    }
+    if (current) sections.push(current)
+
+    const sectionsHtml = sections.map(sec => {
+      if (!sec.title) {
+        return `<div class="intro">${inlineMarkdown(sec.body)}</div>`
+      }
+      const emoji = getSectionEmoji(sec.title)
+      return `<div class="section"><h2>${emoji} ${escapeHtml(sec.title)}</h2><div class="body">${inlineMarkdown(sec.body)}</div></div>`
+    }).join('\n')
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(clientName)} — ${title} (${escapeHtml(dateRange)})</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 24px; color: #111827; line-height: 1.65; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 4px; color: #111827; }
+    .subtitle { color: #6b7280; font-size: 0.875rem; margin: 0 0 32px; }
+    .section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; background: #fafafa; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 0 0 12px; color: #111827; }
+    .intro { margin-bottom: 24px; color: #374151; }
+    .body { color: #374151; }
+    ul { padding-left: 20px; margin: 8px 0; }
+    li { margin-bottom: 4px; }
+    strong { font-weight: 600; }
+    em { font-style: italic; }
+    br + br { display: none; }
+    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 0.75rem; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(clientName)}</h1>
+  <p class="subtitle">${title} &middot; ${escapeHtml(dateRange)}</p>
+  ${sectionsHtml}
+  <div class="footer">Generated ${generatedDate}${report?.model ? ` &middot; ${escapeHtml(report.model)}` : ''}</div>
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${clientSlug}-${isInsights ? 'insights' : 'report'}-${dateStart}-${dateEnd}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const cd = report?.chartData || {}
 
   return (
@@ -413,11 +495,16 @@ export default function WeeklyInsightsPanel({ clientSlug, clientId }) {
                   <span className={theme.muted}>
                     {(insights?.usage?.totalTokens || 0) + (report?.usage?.totalTokens || 0)} tokens
                   </span>
-                  {activeView === 'report' && (
-                    <button onClick={copyReport} className="text-indigo-600 hover:text-indigo-800 font-medium">
-                      Copy
+                  <>
+                    {activeView === 'report' && (
+                      <button onClick={copyReport} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                        Copy
+                      </button>
+                    )}
+                    <button onClick={exportReportHtml} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                      Export
                     </button>
-                  )}
+                  </>
                 </div>
               </div>
             </div>
@@ -710,6 +797,10 @@ function getSectionEmoji(title) {
   if (t.includes('next') || t.includes('focus') || t.includes('priority')) return '\u{1F3AF}'
   if (t.includes('content') || t.includes('format')) return '\u{1F3A8}'
   return '\u{1F4CC}'
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 function inlineMarkdown(md) {
