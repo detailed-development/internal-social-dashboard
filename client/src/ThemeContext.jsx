@@ -221,10 +221,10 @@ export const THEMES = {
         bar: 'bg-lime-500',
       },
       aging: {
-        pill: 'bg-amber-50 text-amber-700 border-amber-200',
+        pill: 'ncm-bg-pink ncm-pink-text ncm-pink-border',
         card: 'border-amber-300/90',
-        dot: 'bg-amber-500',
-        bar: 'bg-amber-500',
+        dot: 'ncm-pink-text',
+        bar: 'ncm-pink-border',
       },
       stale: {
         pill: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
@@ -347,22 +347,22 @@ export const THEMES = {
     // Semantic status tokens
     status: {
       fresh: {
-        pill: 'bg-emerald-500/15 text-emerald-200 border-emerald-400/35',
+        pill: 'ncm-darkmode-bg-green ncm-darkmode-green-text border-emerald-400/35',
         card: 'border-emerald-500/45',
-        dot: 'bg-emerald-300',
-        bar: 'bg-emerald-400',
+        dot: 'ncm-darkmode-green-text',
+        bar: 'ncm-darkmode-green-text',
       },
       aging: {
-        pill: 'bg-amber-500/15 text-amber-200 border-amber-400/35',
+        pill: 'bg-amber-500/15 ncm-darkmode-yellow-text border-amber-400/35',
         card: 'border-amber-500/45',
-        dot: 'bg-amber-300',
-        bar: 'bg-amber-400',
+        dot: 'ncm-darkmode-yellow-text',
+        bar: 'ncm-darkmode-yellow-text',
       },
       stale: {
-        pill: 'bg-red-500/15 text-red-200 border-red-400/35',
+        pill: 'bg-red-500/15 ncm-darkmode-red-text border-red-400/35',
         card: 'border-red-500/45',
-        dot: 'bg-red-300',
-        bar: 'bg-red-400',
+        dot: 'ncm-darkmode-red-text',
+        bar: 'ncm-darkmode-red-text',
       },
       unknown: {
         pill: 'bg-gray-800 text-gray-200 border-gray-600',

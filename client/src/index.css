@@ -61,3 +61,30 @@
 .border-ncm-orange {
   border-color: rgb(284 98 92 / var(--tw-border-opacity, .8));
 }
+.ncm-pink-text {
+  --tw-text-opacity: 1;
+  color: rgb(255 12 18 / var(--tw-text-opacity, 1));
+}
+.ncm-bg-pink {
+  --tw-bg-opacity: 1;
+    background-color: rgb(250 245 245 / var(--tw-bg-opacity, .5));
+}
+.ncm-pink-border {
+  --tw-border-opacity: 1;
+  border-color: rgb(253 30 138 / var(--tw-border-opacity, 1));
+}
+.ncm-darkmode-green-text {
+  --tw-text-opacity: 1;
+  color: rgb(187 255 248 / var(--tw-text-opacity, 1));
+}
+.ncm-darkmode-bg-green {
+ background-color: #10b98123;
+}
+.ncm-darkmode-yellow-text {
+  --tw-text-opacity: 1;
+  color: rgb(255 255 158 / var(--tw-text-opacity, 1));
+}
+.ncm-darkmode-red-text {
+  --tw-text-opacity: 1;
+  color: rgb(255 175 175 / var(--tw-text-opacity, 1));
+}
