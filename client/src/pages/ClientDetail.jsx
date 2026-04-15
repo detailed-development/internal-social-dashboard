@@ -9,6 +9,7 @@ import StatCard from '../components/StatCard'
 import PostCard from '../components/PostCard'
 import EngagementChart from '../components/EngagementChart'
 import PostTypeBreakdownChart from '../components/PostTypeBreakdownChart'
+import EngagementTrendChart from '../components/EngagementTrendChart'
 import PlatformBadge from '../components/PlatformBadge'
 import WebAnalyticsSection from '../components/WebAnalyticsSection'
 import MessagesSection from '../components/MessagesSection'
@@ -601,6 +602,12 @@ export default function ClientDetail() {
           {overview?.chartData?.postTypeBreakdown?.length > 0 && (
             <div className={`border rounded-xl p-5 mb-8 ${theme.card}`}>
               <PostTypeBreakdownChart postTypeBreakdown={overview.chartData.postTypeBreakdown} />
+            </div>
+          )}
+
+          {overview?.chartData?.dailyEngagement?.length > 0 && (
+            <div className={`border rounded-xl p-5 mb-8 ${theme.card}`}>
+              <EngagementTrendChart dailyEngagement={overview.chartData.dailyEngagement} />
             </div>
           )}
 
