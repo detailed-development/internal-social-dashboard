@@ -10,6 +10,7 @@ import Overview from './pages/Overview'
 const ClientDetail = lazy(() => import('./pages/ClientDetail'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AITools = lazy(() => import('./pages/AITools'))
+const ToolsPlugins = lazy(() => import('./pages/ToolsPlugins'))
 
 const bypassAuth = import.meta.env.VITE_BYPASS_AUTH === 'true'
 
@@ -48,6 +49,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/tools-plugins"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ToolsPlugins />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/admin"
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -73,6 +82,14 @@ export default function App() {
                     element={
                       <Suspense fallback={<PageLoader />}>
                         <AITools />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/tools-plugins"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <ToolsPlugins />
                       </Suspense>
                     }
                   />

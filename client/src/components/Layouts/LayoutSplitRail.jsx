@@ -54,6 +54,14 @@ const AIToolsIcon = () => (
   </svg>
 )
 
+const PluginsIcon = () => (
+  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 2v6" />
+    <path d="M15 2v6" />
+    <path d="M5 8h14a1 1 0 0 1 1 1v3a6 6 0 0 1-6 6h-.5V22h-3v-4H10a6 6 0 0 1-6-6V9a1 1 0 0 1 1-1z" />
+  </svg>
+)
+
 const GearIcon = () => (
   <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -237,25 +245,33 @@ export default function Layout() {
 
     return (
       <div className="flex h-full min-h-0">
-        <div className={`flex w-16 flex-col border-r ${theme.sidebarBorder}`}>
-          <div className={`px-2 py-4 border-b ${theme.sidebarBorder}`}>
+        <div className={`flex w-16 flex-col border-r min-h-0 ${theme.sidebarBorder}`}>
+          <div className={`px-2 py-4 border-b flex-shrink-0 ${theme.sidebarBorder}`}>
             <div className={`w-10 h-10 mx-auto rounded-2xl flex items-center justify-center text-lg font-bold ${theme.navItemActive}`}>
               {theme.id === 'neon-cactus' ? '🌵' : 'N'}
             </div>
           </div>
 
-          <div className="px-2 py-3 space-y-2">
+          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-2">
             <NavButton
               to="/"
               icon={<OverviewIcon />}
-              label="Overview"
+              label="Client Analytics"
+              isMinimized
+              activeClass={theme.navItemActive}
+              inactiveClass={theme.navItemInactive}
+            />
+            <NavButton
+              to="/tools-plugins"
+              icon={<PluginsIcon />}
+              label="Tools & Plugins"
               isMinimized
               activeClass={theme.navItemActive}
               inactiveClass={theme.navItemInactive}
             />
           </div>
 
-          <div className="mt-auto px-2 py-3 space-y-2 border-t border-white/10">
+          <div className="flex-shrink-0 px-2 py-3 space-y-2 border-t border-white/10">
             <NavButton
               to="/admin"
               icon={<GearIcon />}
@@ -312,7 +328,7 @@ export default function Layout() {
       </aside>
 
       <aside
-        className={`hidden md:flex flex-shrink-0 overflow-x-hidden transition-all duration-300 ease-in-out ${minimized ? 'w-16' : 'w-80'} ${sidebarBgClass}`}
+        className={`hidden md:flex flex-shrink-0 overflow-x-hidden transition-all duration-300 ease-in-out ${minimized ? 'w-16' : 'w-auto'} ${sidebarBgClass}`}
         style={sidebarStyle}
       >
         {renderSidebar(false)}
