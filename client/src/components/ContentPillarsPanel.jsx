@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from '../ThemeContext'
+import PlatformBadge from './PlatformBadge'
 import {
   getContentPillars, createContentPillar, updateContentPillar,
   deleteContentPillar, assignPostToPillar, unassignPostFromPillar,
@@ -10,7 +11,7 @@ const PILLAR_COLORS = [
   '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16', '#f97316',
 ]
 
-export default function ContentPillarsPanel({ clientId, posts = [], onFilterChange }) {
+export default function ContentPillarsPanel({ clientId, posts = [], onFilterChange, onPillarsChange, onPostPillarChange }) {
   const { theme } = useTheme()
   const [pillars, setPillars] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,10 +27,18 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
   useEffect(() => {
     if (!clientId) return
     getContentPillars(clientId)
-      .then(setPillars)
+      .then(data => {
+        setPillars(data)
+        onPillarsChange?.(data)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [clientId])
+
+  function syncPillars(updated) {
+    setPillars(updated)
+    onPillarsChange?.(updated)
+  }
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -37,7 +46,8 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
     setCreating(true)
     try {
       const pillar = await createContentPillar({ clientId, name: newName.trim(), color: newColor })
-      setPillars(prev => [...prev, { ...pillar, _count: { posts: 0 } }])
+      const updated = [...pillars, { ...pillar, _count: { posts: 0 } }]
+      syncPillars(updated)
       setNewName('')
     } catch {}
     setCreating(false)
@@ -47,7 +57,8 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
     if (!editName.trim()) return
     try {
       const updated = await updateContentPillar(id, { name: editName.trim() })
-      setPillars(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p))
+      const next = pillars.map(p => p.id === id ? { ...p, ...updated } : p)
+      syncPillars(next)
     } catch {}
     setEditingId(null)
   }
@@ -55,7 +66,8 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
   async function handleDelete(id) {
     try {
       await deleteContentPillar(id)
-      setPillars(prev => prev.filter(p => p.id !== id))
+      const next = pillars.filter(p => p.id !== id)
+      syncPillars(next)
       if (selectedPillarId === id) {
         setSelectedPillarId(null)
         onFilterChange?.(null)
@@ -71,12 +83,13 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
       } else {
         await assignPostToPillar(pillarId, postId)
       }
-      // Update local post pillar data (optimistic)
-      setPillars(prev => prev.map(p => {
+      const next = pillars.map(p => {
         if (p.id !== pillarId) return p
         const newCount = isAssigned ? (p._count?.posts || 1) - 1 : (p._count?.posts || 0) + 1
         return { ...p, _count: { posts: Math.max(0, newCount) } }
-      }))
+      })
+      syncPillars(next)
+      onPostPillarChange?.(pillarId, postId, isAssigned)
     } catch {}
     setAssigningPostId(null)
   }
@@ -93,11 +106,10 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
 
   return (
     <div className={`border rounded-xl mb-8 overflow-hidden ${theme.card}`}>
-      {/* Header row */}
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className={`w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:opacity-80`}
+        className="w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:opacity-80"
       >
         <div className="flex items-center gap-2">
           <span className={`text-sm font-semibold ${theme.heading}`}>Content Pillars</span>
@@ -120,7 +132,6 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
 
       {open && (
         <div className={`border-t px-5 py-4 space-y-4 ${theme.cardDivider}`}>
-          {/* Pillar list */}
           {pillars.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {pillars.map(p => (
@@ -177,7 +188,6 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
             <p className={`text-xs ${theme.muted}`}>No content pillars yet. Create one below.</p>
           )}
 
-          {/* Create pillar form */}
           <form onSubmit={handleCreate} className="flex items-center gap-2 flex-wrap">
             <input
               value={newName}
@@ -205,7 +215,6 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
             </button>
           </form>
 
-          {/* Post assignment — only shown when a pillar is selected */}
           {selectedPillarId && posts.length > 0 && (
             <div>
               <p className={`text-xs font-semibold uppercase tracking-[0.14em] mb-2 ${theme.subtext}`}>
@@ -225,6 +234,11 @@ export default function ContentPillarsPanel({ clientId, posts = [], onFilterChan
                       }`}
                     >
                       <span className={`w-3 h-3 rounded flex-shrink-0 border-2 ${isAssigned ? 'bg-indigo-500 border-indigo-500' : 'border-gray-300'}`} />
+                      {post.platform && (
+                        <span className="flex-shrink-0">
+                          <PlatformBadge platform={post.platform} />
+                        </span>
+                      )}
                       <span className="truncate flex-1">{post.caption?.slice(0, 80) || `Post ${post.id.slice(0, 8)}`}</span>
                       <span className={theme.muted}>{new Date(post.publishedAt).toLocaleDateString()}</span>
                     </button>

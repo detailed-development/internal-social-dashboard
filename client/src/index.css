@@ -97,3 +97,8 @@
 .ncm-darkmode-red-bar {
   background-color: rgb(255 175 175 / var(--tw-text-opacity, 1));
 }
+
+
+.w-auto {
+  width: auto;
+}
