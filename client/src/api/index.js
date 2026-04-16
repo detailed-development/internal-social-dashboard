@@ -14,6 +14,7 @@ export const getClientOverview = (slug, { start, end } = {}) =>
   api.get(`/analytics/clients/${slug}/overview`, { params: { start, end } }).then(r => r.data)
 export const getGa4Properties = () => api.get('/ga4-properties').then(r => r.data)
 export const addSocialAccount = (slug, platform, handle) => api.post(`/clients/${slug}/add-social`, { platform, handle }).then(r => r.data)
+export const removeSocialAccount = (slug, accountId) => api.delete(`/clients/${slug}/social/${accountId}`)
 export const refreshMetaTokens = (token) => api.post('/admin/refresh-meta-tokens', { token }).then(r => r.data)
 export const triggerAutoRefresh = () => api.get('/admin/refresh-meta-tokens').then(r => r.data)
 export const exchangeShortToken = (shortToken) => api.post('/admin/exchange-short-token', { shortToken }).then(r => r.data)
@@ -40,6 +41,16 @@ export const getReportStyles = (clientId) => api.get('/report-styles', { params:
 export const createReportStyle = (data) => api.post('/report-styles', data).then(r => r.data)
 export const updateReportStyle = (id, data) => api.patch(`/report-styles/${id}`, data).then(r => r.data)
 export const deleteReportStyle = (id) => api.delete(`/report-styles/${id}`)
+
+// Plugins / Tools
+export const getPlugins = () => api.get('/plugins').then(r => r.data)
+export const createPlugin = (data) => api.post('/plugins', data).then(r => r.data)
+export const updatePlugin = (id, data) => api.patch(`/plugins/${id}`, data).then(r => r.data)
+export const deletePlugin = (id) => api.delete(`/plugins/${id}`)
+
+// Platform App Passwords
+export const getPlatformAppPassword = (platform) => api.get(`/platform-app-passwords/${platform}`).then(r => r.data)
+export const updatePlatformAppPassword = (platform, data) => api.put(`/platform-app-passwords/${platform}`, data).then(r => r.data)
 
 // AI features
 export const generateWeeklyInsights = (params) => api.post('/ai/weekly-insights', params).then(r => r.data)

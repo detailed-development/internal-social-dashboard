@@ -55,6 +55,7 @@ enum Platform {
   TIKTOK
   YOUTUBE
   TWITTER
+  LINKEDIN
 }
 
 enum TokenStatus {
@@ -500,4 +501,49 @@ model ClientReportInputSnapshot {
   @@unique([clientId, feature, dateRangeStart, dateRangeEnd, inputVersion])
   @@index([clientId, feature, dateRangeStart, dateRangeEnd])
   @@map("client_report_input_snapshots")
+}
+
+// Custom plugins/tools uploaded by the user. Stored as rows in the DB and
+// rendered as nodes in the Tools & Plugins page. Free-form `category` is a
+// plain string so users can add arbitrary groupings without a second table.
+model Plugin {
+  id          String   @id @default(cuid())
+  title       String
+  category    String   @default("General")
+  description String?
+  content     String?
+  downloadUrl String?  @map("download_url")
+  fileName    String?  @map("file_name")
+  fileType    String?  @map("file_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("plugins")
+}
+
+// Platform-wide "App Password" per social-account platform. Locked/obfuscated
+// in the UI by default; each edit writes a new history row so we can display
+// who changed it and when.
+model PlatformAppPassword {
+  id        String                       @id @default(cuid())
+  platform  Platform                     @unique
+  password  String?
+  updatedAt DateTime                     @updatedAt @map("updated_at")
+  history   PlatformAppPasswordHistory[]
+
+  @@map("platform_app_passwords")
+}
+
+model PlatformAppPasswordHistory {
+  id                    String              @id @default(cuid())
+  platformAppPasswordId String              @map("platform_app_password_id")
+  platform              Platform
+  password              String?
+  changedBy             String?             @map("changed_by")
+  changedAt             DateTime            @default(now()) @map("changed_at")
+  parent                PlatformAppPassword @relation(fields: [platformAppPasswordId], references: [id], onDelete: Cascade)
+
+  @@index([platform, changedAt(sort: Desc)])
+  @@map("platform_app_password_history")
 }

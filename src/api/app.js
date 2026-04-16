@@ -11,6 +11,8 @@ import socialRoutes from './routes/social.js';
 import aiRoutes from './routes/ai.js';
 import contentPillarsRoutes from './routes/content-pillars.js';
 import reportStylesRoutes from './routes/report-styles.js';
+import pluginsRoutes from './routes/plugins.js';
+import platformAppPasswordsRoutes from './routes/platform-app-passwords.js';
 
 const app = express();
 
@@ -53,5 +55,7 @@ app.use('/api/social', socialRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/content-pillars', contentPillarsRoutes);
 app.use('/api/report-styles', reportStylesRoutes);
+app.use('/api/plugins', pluginsRoutes);
+app.use('/api/platform-app-passwords', platformAppPasswordsRoutes);
 
 export default app;
