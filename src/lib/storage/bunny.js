@@ -42,10 +42,28 @@ function slugifyFilename(name) {
     .slice(0, 120) || 'file.zip'
 }
 
-export function buildPluginStorageKey(pluginId, fileName) {
+function slugifyTitle(title) {
+  return (title || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9\s-]+/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60)
+}
+
+// Folder layout: {prefix}/{titleSlug}-{idSuffix}/{timestamp}-{fileSlug}
+// Title slug makes the Bunny file manager readable; short id suffix keeps
+// folders unique when two plugins share a title. Falls back to the full id
+// if the title is empty.
+export function buildPluginStorageKey(pluginId, fileName, title) {
   const prefix = env('BUNNY_PLUGIN_PREFIX', DEFAULT_PREFIX).replace(/^\/+|\/+$/g, '')
   const safe = slugifyFilename(fileName)
-  return `${prefix}/${pluginId}/${Date.now()}-${safe}`
+  const titleSlug = slugifyTitle(title)
+  const idSuffix = String(pluginId || '').slice(-6)
+  const folder = titleSlug ? `${titleSlug}-${idSuffix}` : pluginId
+  return `${prefix}/${folder}/${Date.now()}-${safe}`
 }
 
 export async function uploadObject(storageKey, body, { contentType = 'application/zip' } = {}) {

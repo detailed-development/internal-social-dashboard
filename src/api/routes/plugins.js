@@ -66,9 +66,16 @@ function unlinkIfExists(filePath) {
 
 // Sign Bunny-hosted download URLs at read time so stored rows stay clean and
 // key rotation doesn't invalidate old data. Non-Bunny rows pass through.
+function signIfBunny(row) {
+  if (!row || row.storageProvider !== 'bunny' || !row.downloadUrl) return row
+  return { ...row, downloadUrl: signCdnUrl(row.downloadUrl) }
+}
+
 function withSignedDownloadUrl(plugin) {
-  if (!plugin || plugin.storageProvider !== 'bunny' || !plugin.downloadUrl) return plugin
-  return { ...plugin, downloadUrl: signCdnUrl(plugin.downloadUrl) }
+  if (!plugin) return plugin
+  const signed = signIfBunny(plugin)
+  if (!plugin.versions) return signed
+  return { ...signed, versions: plugin.versions.map(signIfBunny) }
 }
 
 // GET /api/plugins  → list all plugins grouped by category on the client.
@@ -77,6 +84,7 @@ router.get('/', async (req, res) => {
   try {
     const plugins = await prisma.plugin.findMany({
       orderBy: [{ category: 'asc' }, { title: 'asc' }],
+      include: { versions: { orderBy: { createdAt: 'desc' } } },
     })
     res.json(plugins.map(withSignedDownloadUrl))
   } catch (err) {
@@ -117,9 +125,10 @@ router.get('/bunny-status', (req, res) => {
 // POST /api/plugins/bunny → multipart upload that streams the ZIP to Bunny
 // Storage and persists storage metadata on a new plugin row. The file never
 // hits server disk; the buffer is released as soon as Bunny ACKs the PUT.
+// Also creates the plugin's first PluginVersion history row.
 router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
   const prisma = req.app.get('prisma')
-  const { title, category, description } = req.body
+  const { title, category, description, version } = req.body
 
   if (!isBunnyConfigured()) {
     return res.status(503).json({ error: 'Bunny storage is not configured on the server.' })
@@ -139,6 +148,7 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
         title,
         category: category || 'General',
         description: description || null,
+        version: version || null,
         fileName: req.file.originalname,
         fileType: 'zip',
         fileSize: req.file.size,
@@ -148,18 +158,36 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
       },
     })
 
-    const storageKey = buildPluginStorageKey(plugin.id, req.file.originalname)
+    const storageKey = buildPluginStorageKey(plugin.id, req.file.originalname, title)
     await uploadObject(storageKey, req.file.buffer, { contentType: 'application/zip' })
+
+    const downloadUrl = getPublicUrl(storageKey)
+    const uploadedAt = new Date()
 
     plugin = await prisma.plugin.update({
       where: { id: plugin.id },
       data: {
         storageKey,
-        downloadUrl: getPublicUrl(storageKey),
+        downloadUrl,
         ingestStatus: 'ready',
         ingestError: null,
-        uploadedAt: new Date(),
+        uploadedAt,
+        versions: {
+          create: {
+            version: version || null,
+            fileName: req.file.originalname,
+            fileType: 'zip',
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype || 'application/zip',
+            storageProvider: 'bunny',
+            storageKey,
+            downloadUrl,
+            ingestStatus: 'ready',
+            uploadedAt,
+          },
+        },
       },
+      include: { versions: { orderBy: { createdAt: 'desc' } } },
     })
 
     res.status(201).json(withSignedDownloadUrl(plugin))
@@ -172,6 +200,148 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
       }).catch(() => {})
     }
     res.status(500).json({ error: err.message || 'Bunny upload failed' })
+  }
+})
+
+// POST /api/plugins/:id/versions/bunny → add a new version to an existing
+// plugin. Uploads to Bunny, inserts a PluginVersion row, and updates the
+// mirrored "current" fields on the plugin to point at the new version.
+router.post('/:id/versions/bunny', bunnyUpload.single('file'), async (req, res) => {
+  const prisma = req.app.get('prisma')
+  const { version } = req.body
+
+  if (!isBunnyConfigured()) {
+    return res.status(503).json({ error: 'Bunny storage is not configured on the server.' })
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'file is required' })
+  }
+
+  try {
+    const existing = await prisma.plugin.findUnique({ where: { id: req.params.id } })
+    if (!existing) return res.status(404).json({ error: 'Plugin not found' })
+
+    const storageKey = buildPluginStorageKey(existing.id, req.file.originalname, existing.title)
+    await uploadObject(storageKey, req.file.buffer, { contentType: 'application/zip' })
+
+    const downloadUrl = getPublicUrl(storageKey)
+    const uploadedAt = new Date()
+
+    const updated = await prisma.plugin.update({
+      where: { id: existing.id },
+      data: {
+        version: version || null,
+        fileName: req.file.originalname,
+        fileType: 'zip',
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype || 'application/zip',
+        storageProvider: 'bunny',
+        storageKey,
+        downloadUrl,
+        ingestStatus: 'ready',
+        ingestError: null,
+        uploadedAt,
+        versions: {
+          create: {
+            version: version || null,
+            fileName: req.file.originalname,
+            fileType: 'zip',
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype || 'application/zip',
+            storageProvider: 'bunny',
+            storageKey,
+            downloadUrl,
+            ingestStatus: 'ready',
+            uploadedAt,
+          },
+        },
+      },
+      include: { versions: { orderBy: { createdAt: 'desc' } } },
+    })
+
+    res.status(201).json(withSignedDownloadUrl(updated))
+  } catch (err) {
+    console.error('[plugins/:id/versions/bunny] upload failed:', err)
+    res.status(500).json({ error: err.message || 'Bunny upload failed' })
+  }
+})
+
+// DELETE /api/plugins/:id/versions/:versionId → remove one version. Also
+// deletes the backing object from Bunny (best-effort). If that version was
+// the plugin's "current" one, the most recent remaining version is promoted;
+// if none remain, the mirrored fields are cleared.
+router.delete('/:id/versions/:versionId', async (req, res) => {
+  const prisma = req.app.get('prisma')
+  try {
+    const version = await prisma.pluginVersion.findUnique({
+      where: { id: req.params.versionId },
+    })
+    if (!version || version.pluginId !== req.params.id) {
+      return res.status(404).json({ error: 'Version not found' })
+    }
+
+    const plugin = await prisma.plugin.findUnique({ where: { id: req.params.id } })
+    if (!plugin) return res.status(404).json({ error: 'Plugin not found' })
+
+    await prisma.pluginVersion.delete({ where: { id: version.id } })
+
+    if (version.storageProvider === 'bunny' && version.storageKey) {
+      await deleteObject(version.storageKey).catch(err => {
+        console.error('[plugins/versions] bunny delete failed:', err.message)
+      })
+    }
+
+    // If the deleted version was the one mirrored on the plugin, repoint
+    // the plugin to the newest remaining version, or clear the fields.
+    const wasCurrent = plugin.storageKey === version.storageKey && !!version.storageKey
+    if (wasCurrent) {
+      const remaining = await prisma.pluginVersion.findFirst({
+        where: { pluginId: plugin.id },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (remaining) {
+        await prisma.plugin.update({
+          where: { id: plugin.id },
+          data: {
+            version: remaining.version,
+            fileName: remaining.fileName,
+            fileType: remaining.fileType,
+            fileSize: remaining.fileSize,
+            mimeType: remaining.mimeType,
+            storageProvider: remaining.storageProvider,
+            storageKey: remaining.storageKey,
+            downloadUrl: remaining.downloadUrl,
+            ingestStatus: remaining.ingestStatus,
+            ingestError: remaining.ingestError,
+            uploadedAt: remaining.uploadedAt,
+          },
+        })
+      } else {
+        await prisma.plugin.update({
+          where: { id: plugin.id },
+          data: {
+            version: null,
+            fileName: null,
+            fileType: null,
+            fileSize: null,
+            mimeType: null,
+            storageProvider: null,
+            storageKey: null,
+            downloadUrl: null,
+            uploadedAt: null,
+          },
+        })
+      }
+    }
+
+    const refreshed = await prisma.plugin.findUnique({
+      where: { id: plugin.id },
+      include: { versions: { orderBy: { createdAt: 'desc' } } },
+    })
+    res.json(withSignedDownloadUrl(refreshed))
+  } catch (err) {
+    console.error('[plugins/versions delete] failed:', err)
+    res.status(500).json({ error: err.message })
   }
 })
 
@@ -261,13 +431,16 @@ router.patch('/:id', upload.single('file'), async (req, res) => {
   }
 })
 
-// DELETE /api/plugins/:id
+// DELETE /api/plugins/:id — also removes every versioned Bunny object so
+// nothing is orphaned in storage. Cascade on plugin_versions takes care of
+// the rows; we just need to scrub the CDN objects before the cascade fires.
 router.delete('/:id', async (req, res) => {
   const prisma = req.app.get('prisma')
 
   try {
     const existing = await prisma.plugin.findUnique({
       where: { id: req.params.id },
+      include: { versions: true },
     })
 
     if (!existing) {
@@ -276,16 +449,22 @@ router.delete('/:id', async (req, res) => {
 
     const managedPath = getManagedUploadPath(existing.downloadUrl)
 
-    await prisma.plugin.delete({
-      where: { id: req.params.id },
-    })
-
-    if (managedPath) {
-      unlinkIfExists(managedPath)
+    const bunnyKeys = new Set()
+    if (existing.storageProvider === 'bunny' && existing.storageKey) {
+      bunnyKeys.add(existing.storageKey)
+    }
+    for (const v of existing.versions) {
+      if (v.storageProvider === 'bunny' && v.storageKey) bunnyKeys.add(v.storageKey)
     }
 
-    if (existing.storageProvider === 'bunny' && existing.storageKey) {
-      await deleteObject(existing.storageKey).catch(() => {})
+    await prisma.plugin.delete({ where: { id: req.params.id } })
+
+    if (managedPath) unlinkIfExists(managedPath)
+
+    for (const key of bunnyKeys) {
+      await deleteObject(key).catch(err => {
+        console.error('[plugins delete] bunny delete failed:', key, err.message)
+      })
     }
 
     res.status(204).end()

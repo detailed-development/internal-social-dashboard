@@ -512,11 +512,13 @@ model Plugin {
   category        String    @default("General")
   description     String?
   content         String?
+  // The fields below mirror the *current* PluginVersion so reads stay cheap.
+  // When a new version is uploaded they are updated to point to it; prior
+  // versions are retained in the plugin_versions table.
+  version         String?
   downloadUrl     String?   @map("download_url")
   fileName        String?   @map("file_name")
   fileType        String?   @map("file_type")
-  // Remote-storage fields (Bunny). Null when plugin is hosted locally or is
-  // a manual URL/snippet. See src/lib/storage/bunny.js.
   storageProvider String?   @map("storage_provider")
   storageKey      String?   @map("storage_key")
   fileSize        Int?      @map("file_size")
@@ -527,8 +529,35 @@ model Plugin {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  versions PluginVersion[]
+
   @@index([category])
   @@map("plugins")
+}
+
+// History of file uploads for a Plugin. The Plugin table mirrors the latest
+// row's storage fields for cheap reads; deleting a row here also removes the
+// backing object from Bunny in the /api/plugins/:id/versions/:vid handler.
+model PluginVersion {
+  id              String    @id @default(cuid())
+  pluginId        String    @map("plugin_id")
+  version         String?
+  fileName        String?   @map("file_name")
+  fileType        String?   @map("file_type")
+  fileSize        Int?      @map("file_size")
+  mimeType        String?   @map("mime_type")
+  storageProvider String?   @map("storage_provider")
+  storageKey      String?   @map("storage_key")
+  downloadUrl     String?   @map("download_url")
+  ingestStatus    String    @default("ready") @map("ingest_status")
+  ingestError     String?   @map("ingest_error")
+  uploadedAt      DateTime? @map("uploaded_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  plugin Plugin @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+
+  @@index([pluginId])
+  @@map("plugin_versions")
 }
 
 // Platform-wide "App Password" per social-account platform. Locked/obfuscated
