@@ -886,7 +886,7 @@ export default function ClientDetail() {
                               setAppPasswordHistoryHoverId(current => current === h.id ? null : current)
                             }
                           }}
-                          className={`text-[11px] px-2 py-1.5 rounded border outline-none transition-colors ${theme.code} ${theme.body} ${isHovered ? theme.cardDivider : 'border-transparent'}`}
+                          className={`relative text-[11px] px-2 py-1.5 rounded border border-transparent outline-none ${theme.code} ${theme.body}`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="truncate">
@@ -897,7 +897,7 @@ export default function ClientDetail() {
                             </span>
                           </div>
                           {isHovered && (
-                            <div className={`mt-2 rounded-md border px-2 py-2 ${theme.code} ${theme.cardDivider}`}>
+                            <div className={`absolute left-2 right-2 top-full z-20 mt-1 rounded-md border px-2 py-2 shadow-lg ${theme.code} ${theme.cardDivider}`}>
                               <p className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.muted}`}>
                                 Saved Value
                               </p>
