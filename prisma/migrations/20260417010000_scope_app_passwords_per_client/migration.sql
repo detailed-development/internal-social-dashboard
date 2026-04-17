@@ -1,6 +1,6 @@
 -- Scope app passwords per client + platform instead of one shared row per platform.
 ALTER TABLE "platform_app_passwords"
-  ADD COLUMN "client_id" UUID;
+  ADD COLUMN "client_id" TEXT;
 
 ALTER TABLE "platform_app_passwords"
   ADD CONSTRAINT "platform_app_passwords_client_id_fkey"
@@ -14,7 +14,7 @@ DROP INDEX "platform_app_passwords_platform_key";
 CREATE TEMP TABLE "_platform_app_password_clone_map" (
   "old_id"    TEXT NOT NULL,
   "new_id"    TEXT NOT NULL,
-  "client_id" UUID NOT NULL,
+  "client_id" TEXT NOT NULL,
   PRIMARY KEY ("old_id", "client_id")
 );
 
