@@ -507,16 +507,25 @@ model ClientReportInputSnapshot {
 // rendered as nodes in the Tools & Plugins page. Free-form `category` is a
 // plain string so users can add arbitrary groupings without a second table.
 model Plugin {
-  id          String   @id @default(cuid())
-  title       String
-  category    String   @default("General")
-  description String?
-  content     String?
-  downloadUrl String?  @map("download_url")
-  fileName    String?  @map("file_name")
-  fileType    String?  @map("file_type")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  title           String
+  category        String    @default("General")
+  description     String?
+  content         String?
+  downloadUrl     String?   @map("download_url")
+  fileName        String?   @map("file_name")
+  fileType        String?   @map("file_type")
+  // Remote-storage fields (Bunny). Null when plugin is hosted locally or is
+  // a manual URL/snippet. See src/lib/storage/bunny.js.
+  storageProvider String?   @map("storage_provider")
+  storageKey      String?   @map("storage_key")
+  fileSize        Int?      @map("file_size")
+  mimeType        String?   @map("mime_type")
+  ingestStatus    String    @default("ready") @map("ingest_status")
+  ingestError     String?   @map("ingest_error")
+  uploadedAt      DateTime? @map("uploaded_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@index([category])
   @@map("plugins")

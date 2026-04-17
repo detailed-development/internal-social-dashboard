@@ -3,13 +3,27 @@ import path from 'path'
 import crypto from 'crypto'
 import multer from 'multer'
 import { Router } from 'express'
+import {
+  isBunnyConfigured,
+  buildPluginStorageKey,
+  getPublicUrl,
+  uploadObject,
+  deleteObject,
+} from '../../lib/storage/bunny.js'
 
 const router = Router()
 
 const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads', 'plugins')
 const LOCAL_FILE_PREFIX = '/_plugin_uploads/'
+const MAX_UPLOAD_BYTES = Number(process.env.PLUGIN_MAX_UPLOAD_BYTES) || 325 * 1024 * 1024
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+
+function zipFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase()
+  if (ext !== '.zip') return cb(new Error('Only .zip files are allowed'))
+  cb(null, true)
+}
 
 const storage = multer.diskStorage({
   destination(req, file, cb) {
@@ -23,16 +37,16 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: {
-    fileSize: 325 * 1024 * 1024, // 325 MB
-  },
-  fileFilter(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase()
-    if (ext !== '.zip') {
-      return cb(new Error('Only .zip files are allowed'))
-    }
-    cb(null, true)
-  },
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  fileFilter: zipFileFilter,
+})
+
+// In-memory multer for the Bunny upload path — the buffer is streamed to
+// Bunny Storage and discarded; no file ever touches the server disk.
+const bunnyUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  fileFilter: zipFileFilter,
 })
 
 function getManagedUploadPath(downloadUrl) {
@@ -83,6 +97,72 @@ router.get('/:id/download', async (req, res) => {
     return res.download(filePath, plugin.fileName || path.basename(filePath))
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/plugins/bunny-status → whether Bunny storage is configured, so the
+// UI can decide to show the "Upload to Bunny" option.
+router.get('/bunny-status', (req, res) => {
+  res.json({ configured: isBunnyConfigured(), maxBytes: MAX_UPLOAD_BYTES })
+})
+
+// POST /api/plugins/bunny → multipart upload that streams the ZIP to Bunny
+// Storage and persists storage metadata on a new plugin row. The file never
+// hits server disk; the buffer is released as soon as Bunny ACKs the PUT.
+router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
+  const prisma = req.app.get('prisma')
+  const { title, category, description } = req.body
+
+  if (!isBunnyConfigured()) {
+    return res.status(503).json({ error: 'Bunny storage is not configured on the server.' })
+  }
+  if (!title) {
+    return res.status(400).json({ error: 'title is required' })
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'file is required' })
+  }
+
+  let plugin
+  try {
+    // Reserve the row first so we can use its id in the storage key.
+    plugin = await prisma.plugin.create({
+      data: {
+        title,
+        category: category || 'General',
+        description: description || null,
+        fileName: req.file.originalname,
+        fileType: 'zip',
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype || 'application/zip',
+        storageProvider: 'bunny',
+        ingestStatus: 'uploading',
+      },
+    })
+
+    const storageKey = buildPluginStorageKey(plugin.id, req.file.originalname)
+    await uploadObject(storageKey, req.file.buffer, { contentType: 'application/zip' })
+
+    plugin = await prisma.plugin.update({
+      where: { id: plugin.id },
+      data: {
+        storageKey,
+        downloadUrl: getPublicUrl(storageKey),
+        ingestStatus: 'ready',
+        ingestError: null,
+        uploadedAt: new Date(),
+      },
+    })
+
+    res.status(201).json(plugin)
+  } catch (err) {
+    if (plugin?.id) {
+      await prisma.plugin.update({
+        where: { id: plugin.id },
+        data: { ingestStatus: 'failed', ingestError: err.message?.slice(0, 500) || 'Upload failed' },
+      }).catch(() => {})
+    }
+    res.status(500).json({ error: err.message || 'Bunny upload failed' })
   }
 })
 
@@ -193,6 +273,10 @@ router.delete('/:id', async (req, res) => {
 
     if (managedPath) {
       unlinkIfExists(managedPath)
+    }
+
+    if (existing.storageProvider === 'bunny' && existing.storageKey) {
+      await deleteObject(existing.storageKey).catch(() => {})
     }
 
     res.status(204).end()

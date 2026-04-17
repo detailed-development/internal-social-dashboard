@@ -62,6 +62,20 @@ export const getPlugins = () => api.get('/plugins').then(r => r.data)
 export const createPlugin = (data) => api.post('/plugins', buildPluginPayload(data)).then(r => r.data)
 export const updatePlugin = (id, data) => api.patch(`/plugins/${id}`, buildPluginPayload(data)).then(r => r.data)
 export const deletePlugin = (id) => api.delete(`/plugins/${id}`)
+export const getBunnyStatus = () => api.get('/plugins/bunny-status').then(r => r.data)
+export const uploadPluginToBunny = (data, onProgress) => {
+  const form = new FormData()
+  form.append('title', data.title || '')
+  form.append('category', data.category || 'General')
+  form.append('description', data.description || '')
+  form.append('file', data.file)
+  return api.post('/plugins/bunny', form, {
+    onUploadProgress: e => {
+      if (!onProgress || !e.total) return
+      onProgress(Math.round((e.loaded / e.total) * 100))
+    },
+  }).then(r => r.data)
+}
 
 // Platform App Passwords
 export const getPlatformAppPassword = (platform) => api.get(`/platform-app-passwords/${platform}`).then(r => r.data)

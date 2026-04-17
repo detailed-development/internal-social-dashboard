@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTheme } from '../ThemeContext'
-import { getPlugins, createPlugin, updatePlugin, deletePlugin } from '../api'
+import {
+  getPlugins,
+  createPlugin,
+  updatePlugin,
+  deletePlugin,
+  getBunnyStatus,
+  uploadPluginToBunny,
+} from '../api'
 
 function groupByCategory(plugins) {
   const map = {}
@@ -79,7 +86,11 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
 
   const hasStoredFile = Boolean(plugin.content && plugin.fileName)
   const isManagedZip = plugin.downloadUrl?.startsWith('/_plugin_uploads/')
-  
+  const isBunnyZip = plugin.storageProvider === 'bunny'
+  const ingestBadge = plugin.ingestStatus && plugin.ingestStatus !== 'ready'
+    ? plugin.ingestStatus
+    : null
+
 
   return (
     <div className={`border rounded-xl p-4 flex flex-col gap-3 ${theme.card}`}>
@@ -89,7 +100,13 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
           <p className={`text-[11px] uppercase tracking-wide mt-0.5 ${theme.muted}`}>
             {plugin.category}
             {plugin.fileType ? ` · ${plugin.fileType}` : ''}
+            {isBunnyZip ? ' · bunny' : ''}
           </p>
+          {ingestBadge && (
+            <p className="text-[10px] mt-0.5 text-amber-500 font-semibold uppercase">
+              {ingestBadge}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
@@ -181,7 +198,7 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
   )
 }
 
-function PluginForm({ initial, theme, onCancel, onSave }) {
+function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
   const [form, setForm] = useState({
     title: initial?.title || '',
     category: initial?.category || 'General',
@@ -194,6 +211,8 @@ function PluginForm({ initial, theme, onCancel, onSave }) {
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [useBunny, setUseBunny] = useState(Boolean(bunnyAvailable && !initial))
+  const [progress, setProgress] = useState(0)
 
   function update(key, value) {
     setForm(f => ({ ...f, [key]: value }))
@@ -227,14 +246,18 @@ function PluginForm({ initial, theme, onCancel, onSave }) {
     if (!form.title.trim()) return
 
     setSaving(true)
+    setProgress(0)
     try {
       await onSave({
         ...form,
         category: form.category.trim() || 'General',
         file,
+        useBunny: useBunny && !!file && !initial,
+        onProgress: p => setProgress(p),
       })
     } finally {
       setSaving(false)
+      setProgress(0)
     }
   }
 
@@ -268,22 +291,48 @@ function PluginForm({ initial, theme, onCancel, onSave }) {
       />
 
       <div className={`rounded-xl border p-3 ${theme.card}`}>
-        <label className={`block text-xs font-semibold uppercase tracking-[0.14em] mb-2 ${theme.subtext}`}>
-          Upload zip
-        </label>
+        <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+          <label className={`text-xs font-semibold uppercase tracking-[0.14em] ${theme.subtext}`}>
+            Upload zip
+          </label>
+          {bunnyAvailable && !initial && (
+            <label className={`inline-flex items-center gap-1.5 text-[11px] ${theme.body}`}>
+              <input
+                type="checkbox"
+                checked={useBunny}
+                onChange={e => setUseBunny(e.target.checked)}
+              />
+              Store on Bunny CDN
+            </label>
+          )}
+        </div>
         <input
           type="file"
           accept=".zip,application/zip"
           onChange={handleZipChange}
+          disabled={saving}
           className={`block w-full text-sm rounded-lg border px-3 py-2 focus:outline-none ${theme.input}`}
         />
         <p className={`text-[11px] mt-2 ${theme.muted}`}>
-          Uploading a zip stores the file on the server and clears the content field below.
+          {useBunny && !initial
+            ? 'Uploads to Bunny CDN. Clears the content field below.'
+            : 'Uploading a zip stores the file on the server and clears the content field below.'}
         </p>
         {file && (
           <p className={`text-[11px] mt-2 ${theme.body}`}>
             Selected: <strong>{file.name}</strong>
           </p>
+        )}
+        {saving && file && progress > 0 && (
+          <div className="mt-2">
+            <div className="h-1.5 w-full rounded-full bg-black/10 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className={`text-[10px] mt-1 ${theme.muted}`}>Uploading… {progress}%</p>
+          </div>
         )}
         {uploadError && (
           <p className="text-xs text-red-500 mt-2">{uploadError}</p>
@@ -340,12 +389,16 @@ export default function ToolsPlugins() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filterCategory, setFilterCategory] = useState('')
+  const [bunnyAvailable, setBunnyAvailable] = useState(false)
 
   useEffect(() => {
     getPlugins()
       .then(setPlugins)
       .catch(() => {})
       .finally(() => setLoading(false))
+    getBunnyStatus()
+      .then(s => setBunnyAvailable(Boolean(s?.configured)))
+      .catch(() => setBunnyAvailable(false))
   }, [])
 
   const grouped = useMemo(() => {
@@ -361,12 +414,16 @@ export default function ToolsPlugins() {
   }, [plugins])
 
   async function handleSave(data) {
+    const { useBunny, onProgress, ...payload } = data
     try {
       if (editing) {
-        const updated = await updatePlugin(editing.id, data)
+        const updated = await updatePlugin(editing.id, payload)
         setPlugins(list => list.map(p => (p.id === updated.id ? updated : p)))
+      } else if (useBunny) {
+        const created = await uploadPluginToBunny(payload, onProgress)
+        setPlugins(list => [...list, created])
       } else {
-        const created = await createPlugin(data)
+        const created = await createPlugin(payload)
         setPlugins(list => [...list, created])
       }
       setFormOpen(false)
@@ -424,6 +481,7 @@ export default function ToolsPlugins() {
             theme={theme}
             onCancel={() => { setFormOpen(false); setEditing(null) }}
             onSave={handleSave}
+            bunnyAvailable={bunnyAvailable}
           />
         </div>
       )}
