@@ -3,7 +3,10 @@
 // receives the file via multer and streams it onward — the browser never
 // sees the AccessKey.
 
+import crypto from 'crypto'
+
 const DEFAULT_PREFIX = 'downloadable/internal-social-dashboard/tools-plugins'
+const DEFAULT_TOKEN_TTL = 3600
 
 function env(name, fallback = '') {
   const v = process.env[name]
@@ -59,6 +62,30 @@ export async function uploadObject(storageKey, body, { contentType = 'applicatio
     throw new Error(`Bunny upload failed (${res.status}): ${text || res.statusText}`)
   }
   return { ok: true }
+}
+
+export function isTokenAuthEnabled() {
+  return Boolean(env('BUNNY_TOKEN_AUTH_KEY'))
+}
+
+// Signs a CDN URL per Bunny's "URL Token Authentication" scheme:
+//   token = base64url(sha256(key + path + expires))
+// and returns the URL with ?token=…&expires=… appended. If token auth is
+// not configured, returns the URL unchanged so public zones keep working.
+export function signCdnUrl(cdnUrl, ttlSeconds) {
+  if (!cdnUrl || !isTokenAuthEnabled()) return cdnUrl
+  const key = env('BUNNY_TOKEN_AUTH_KEY')
+  const ttl = Number(ttlSeconds || env('BUNNY_TOKEN_TTL_SECONDS') || DEFAULT_TOKEN_TTL)
+  const url = new URL(cdnUrl)
+  const expires = Math.floor(Date.now() / 1000) + ttl
+  const hash = crypto
+    .createHash('sha256')
+    .update(key + url.pathname + expires)
+    .digest('base64')
+  const token = hash.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  url.searchParams.set('token', token)
+  url.searchParams.set('expires', String(expires))
+  return url.toString()
 }
 
 export async function deleteObject(storageKey) {

@@ -9,6 +9,7 @@ import {
   getPublicUrl,
   uploadObject,
   deleteObject,
+  signCdnUrl,
 } from '../../lib/storage/bunny.js'
 
 const router = Router()
@@ -63,6 +64,13 @@ function unlinkIfExists(filePath) {
   }
 }
 
+// Sign Bunny-hosted download URLs at read time so stored rows stay clean and
+// key rotation doesn't invalidate old data. Non-Bunny rows pass through.
+function withSignedDownloadUrl(plugin) {
+  if (!plugin || plugin.storageProvider !== 'bunny' || !plugin.downloadUrl) return plugin
+  return { ...plugin, downloadUrl: signCdnUrl(plugin.downloadUrl) }
+}
+
 // GET /api/plugins  → list all plugins grouped by category on the client.
 router.get('/', async (req, res) => {
   const prisma = req.app.get('prisma')
@@ -70,7 +78,7 @@ router.get('/', async (req, res) => {
     const plugins = await prisma.plugin.findMany({
       orderBy: [{ category: 'asc' }, { title: 'asc' }],
     })
-    res.json(plugins)
+    res.json(plugins.map(withSignedDownloadUrl))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -154,7 +162,7 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
       },
     })
 
-    res.status(201).json(plugin)
+    res.status(201).json(withSignedDownloadUrl(plugin))
   } catch (err) {
     if (plugin?.id) {
       await prisma.plugin.update({
