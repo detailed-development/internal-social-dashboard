@@ -7,6 +7,8 @@ import {
   deletePlugin,
   getBunnyStatus,
   uploadPluginToBunny,
+  uploadPluginVersionToBunny,
+  deletePluginVersion,
 } from '../api'
 
 function groupByCategory(plugins) {
@@ -71,9 +73,111 @@ function downloadStoredFile(plugin) {
   URL.revokeObjectURL(url)
 }
 
-function PluginNode({ plugin, theme, onEdit, onDelete }) {
+function formatFileSize(bytes) {
+  if (!bytes && bytes !== 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatVersionDate(value) {
+  if (!value) return ''
+  try {
+    return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch {
+    return ''
+  }
+}
+
+function NewVersionForm({ theme, onCancel, onSubmit }) {
+  const [version, setVersion] = useState('')
+  const [file, setFile] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState('')
+
+  function handleFile(e) {
+    const selected = e.target.files?.[0]
+    if (!selected) return
+    if (!selected.name.toLowerCase().endsWith('.zip')) {
+      setError('Only .zip files are supported.')
+      e.target.value = ''
+      return
+    }
+    setFile(selected)
+    setError('')
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!file) return
+    setSaving(true)
+    setProgress(0)
+    try {
+      await onSubmit({ version, file, onProgress: setProgress })
+    } finally {
+      setSaving(false)
+      setProgress(0)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={`mt-2 rounded-lg border p-3 space-y-2 ${theme.card}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2">
+        <input
+          value={version}
+          onChange={e => setVersion(e.target.value)}
+          placeholder="Version (e.g. 1.0.1)"
+          className={`text-xs rounded border px-2 py-1 focus:outline-none ${theme.input}`}
+        />
+        <input
+          type="file"
+          accept=".zip,application/zip"
+          onChange={handleFile}
+          disabled={saving}
+          className={`block w-full text-xs rounded border px-2 py-1 focus:outline-none ${theme.input}`}
+        />
+      </div>
+      {saving && file && progress > 0 && (
+        <div>
+          <div className="h-1.5 w-full rounded-full bg-black/10 overflow-hidden">
+            <div
+              className={`h-full bg-emerald-500 transition-all ${progress >= 100 ? 'animate-pulse' : ''}`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className={`text-[10px] mt-1 ${theme.muted}`}>
+            {progress >= 100 ? 'Transferring to Bunny CDN…' : `Uploading… ${progress}%`}
+          </p>
+        </div>
+      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={saving || !file}
+          className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-colors ${theme.btnPrimary}`}
+        >
+          {saving ? '…' : 'Upload version'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-colors ${theme.btnCancel}`}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDeleteVersion, bunnyAvailable }) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [versionsOpen, setVersionsOpen] = useState(false)
+  const [newVersionOpen, setNewVersionOpen] = useState(false)
 
   async function handleCopy() {
     if (!plugin.content) return
@@ -90,7 +194,15 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
   const ingestBadge = plugin.ingestStatus && plugin.ingestStatus !== 'ready'
     ? plugin.ingestStatus
     : null
+  const versions = plugin.versions || []
+  const canAddVersion = isBunnyZip && bunnyAvailable
 
+  async function handleUploadVersion(data) {
+    try {
+      await onUploadVersion(plugin.id, data)
+      setNewVersionOpen(false)
+    } catch {}
+  }
 
   return (
     <div className={`border rounded-xl p-4 flex flex-col gap-3 ${theme.card}`}>
@@ -99,6 +211,7 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
           <p className={`font-semibold text-sm truncate ${theme.heading}`}>{plugin.title}</p>
           <p className={`text-[11px] uppercase tracking-wide mt-0.5 ${theme.muted}`}>
             {plugin.category}
+            {plugin.version ? ` · v${plugin.version.replace(/^v/i, '')}` : ''}
             {plugin.fileType ? ` · ${plugin.fileType}` : ''}
             {isBunnyZip ? ' · bunny' : ''}
           </p>
@@ -120,7 +233,7 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
           <button
             type="button"
             onClick={() => {
-              if (confirm(`Delete "${plugin.title}"?`)) onDelete(plugin.id)
+              if (confirm(`Delete "${plugin.title}" and all its versions?`)) onDelete(plugin.id)
             }}
             className="text-[10px] px-2 py-1 rounded text-red-400 hover:text-red-600 font-medium"
             title="Delete plugin"
@@ -172,8 +285,6 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
         </div>
       )}
 
-
-
       {isManagedZip ? (
         <a
           href={`/api/plugins/${plugin.id}/download`}
@@ -182,7 +293,7 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
           ⬇ Download {plugin.fileName || 'zip'}
         </a>
       ) : (
-        !hasStoredFile && plugin.downloadUrl && (
+        !hasStoredFile && !isBunnyZip && plugin.downloadUrl && (
           <a
             href={plugin.downloadUrl}
             download={plugin.fileName || true}
@@ -194,6 +305,110 @@ function PluginNode({ plugin, theme, onEdit, onDelete }) {
           </a>
         )
       )}
+
+      {isBunnyZip && versions.length > 0 && (
+        <div className="pt-2 border-t border-current/10">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setVersionsOpen(v => !v)}
+              className={`text-[11px] font-semibold ${theme.subtext} hover:opacity-80`}
+            >
+              Versions ({versions.length}) {versionsOpen ? '▲' : '▼'}
+            </button>
+            {canAddVersion && !newVersionOpen && (
+              <button
+                type="button"
+                onClick={() => { setNewVersionOpen(true); setVersionsOpen(true) }}
+                className={`text-[11px] px-2 py-0.5 rounded-lg font-semibold transition-colors ${theme.btnPrimary}`}
+              >
+                + New version
+              </button>
+            )}
+          </div>
+
+          {versionsOpen && (
+            <ul className="mt-2 space-y-1.5">
+              {versions.map(v => (
+                <li
+                  key={v.id}
+                  className={`flex items-center justify-between gap-2 text-[11px] rounded-lg border px-2 py-1.5 ${theme.card}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`font-semibold ${theme.heading}`}>
+                        {v.version || 'unversioned'}
+                      </span>
+                      {plugin.storageKey === v.storageKey && v.storageKey && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 font-semibold uppercase">
+                          current
+                        </span>
+                      )}
+                    </div>
+                    <div className={`${theme.muted} text-[10px] truncate`}>
+                      {v.fileName}{v.fileSize ? ` · ${formatFileSize(v.fileSize)}` : ''}{v.createdAt ? ` · ${formatVersionDate(v.createdAt)}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {v.downloadUrl && (
+                      <a
+                        href={v.downloadUrl}
+                        download={v.fileName || true}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`text-[10px] px-2 py-0.5 rounded border font-semibold transition-colors ${theme.btnCancel}`}
+                        title="Download version"
+                      >
+                        ⬇
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Delete version "${v.version || 'unversioned'}"?`)) {
+                          onDeleteVersion(plugin.id, v.id)
+                        }
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded text-red-400 hover:text-red-600 font-medium"
+                      title="Delete version"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {newVersionOpen && (
+            <NewVersionForm
+              theme={theme}
+              onCancel={() => setNewVersionOpen(false)}
+              onSubmit={handleUploadVersion}
+            />
+          )}
+        </div>
+      )}
+
+      {isBunnyZip && versions.length === 0 && canAddVersion && (
+        <div className="pt-2 border-t border-current/10">
+          {newVersionOpen ? (
+            <NewVersionForm
+              theme={theme}
+              onCancel={() => setNewVersionOpen(false)}
+              onSubmit={handleUploadVersion}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNewVersionOpen(true)}
+              className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-colors ${theme.btnPrimary}`}
+            >
+              + Upload version
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -203,6 +418,7 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
     title: initial?.title || '',
     category: initial?.category || 'General',
     description: initial?.description || '',
+    version: initial?.version || '',
     content: initial?.content || '',
     downloadUrl: initial?.downloadUrl || '',
     fileName: initial?.fileName || '',
@@ -283,12 +499,20 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
         />
       </div>
 
-      <input
-        value={form.description}
-        onChange={e => update('description', e.target.value)}
-        placeholder="Short description"
-        className={`w-full text-sm rounded-lg border px-3 py-1.5 focus:outline-none ${theme.input}`}
-      />
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
+        <input
+          value={form.description}
+          onChange={e => update('description', e.target.value)}
+          placeholder="Short description"
+          className={`text-sm rounded-lg border px-3 py-1.5 focus:outline-none ${theme.input}`}
+        />
+        <input
+          value={form.version}
+          onChange={e => update('version', e.target.value)}
+          placeholder="Version (e.g. 1.0.0)"
+          className={`text-sm rounded-lg border px-3 py-1.5 focus:outline-none ${theme.input}`}
+        />
+      </div>
 
       <div className={`rounded-xl border p-3 ${theme.card}`}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -453,6 +677,34 @@ export default function ToolsPlugins() {
     }
   }
 
+  async function handleUploadVersion(id, data) {
+    const { onProgress, ...rest } = data
+    try {
+      const updated = await uploadPluginVersionToBunny(id, rest, onProgress)
+      setPlugins(list => list.map(p => (p.id === updated.id ? updated : p)))
+    } catch (err) {
+      const status = err?.response?.status
+      const serverMsg = err?.response?.data?.error
+      const parts = [
+        serverMsg || err?.message || 'Failed to upload version.',
+        status ? `(HTTP ${status})` : err?.code ? `(${err.code})` : null,
+      ].filter(Boolean)
+      console.error('[plugin version upload failed]', err)
+      alert(parts.join(' '))
+      throw err
+    }
+  }
+
+  async function handleDeleteVersion(id, versionId) {
+    try {
+      const updated = await deletePluginVersion(id, versionId)
+      setPlugins(list => list.map(p => (p.id === updated.id ? updated : p)))
+    } catch (err) {
+      const serverMsg = err?.response?.data?.error
+      alert(serverMsg || err?.message || 'Failed to delete version.')
+    }
+  }
+
   return (
     <div className="p-4 sm:p-8">
       <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
@@ -523,8 +775,11 @@ export default function ToolsPlugins() {
                     key={p.id}
                     plugin={p}
                     theme={theme}
+                    bunnyAvailable={bunnyAvailable}
                     onEdit={() => { setEditing(p); setFormOpen(true) }}
                     onDelete={handleDelete}
+                    onUploadVersion={handleUploadVersion}
+                    onDeleteVersion={handleDeleteVersion}
                   />
                 ))}
               </div>

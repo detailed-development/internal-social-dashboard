@@ -49,12 +49,20 @@ function buildPluginPayload(data) {
   form.append('title', data.title || '')
   form.append('category', data.category || 'General')
   form.append('description', data.description || '')
+  form.append('version', data.version || '')
   form.append('content', data.content || '')
   form.append('fileName', data.fileName || '')
   form.append('fileType', data.fileType || '')
   form.append('file', data.file)
 
   return form
+}
+
+function uploadProgressHandler(onProgress) {
+  return e => {
+    if (!onProgress || !e.total) return
+    onProgress(Math.round((e.loaded / e.total) * 100))
+  }
 }
 
 // Plugins / Tools
@@ -68,14 +76,22 @@ export const uploadPluginToBunny = (data, onProgress) => {
   form.append('title', data.title || '')
   form.append('category', data.category || 'General')
   form.append('description', data.description || '')
+  form.append('version', data.version || '')
   form.append('file', data.file)
   return api.post('/plugins/bunny', form, {
-    onUploadProgress: e => {
-      if (!onProgress || !e.total) return
-      onProgress(Math.round((e.loaded / e.total) * 100))
-    },
+    onUploadProgress: uploadProgressHandler(onProgress),
   }).then(r => r.data)
 }
+export const uploadPluginVersionToBunny = (id, data, onProgress) => {
+  const form = new FormData()
+  form.append('version', data.version || '')
+  form.append('file', data.file)
+  return api.post(`/plugins/${id}/versions/bunny`, form, {
+    onUploadProgress: uploadProgressHandler(onProgress),
+  }).then(r => r.data)
+}
+export const deletePluginVersion = (id, versionId) =>
+  api.delete(`/plugins/${id}/versions/${versionId}`).then(r => r.data)
 
 // Platform App Passwords
 export const getPlatformAppPassword = (platform) => api.get(`/platform-app-passwords/${platform}`).then(r => r.data)

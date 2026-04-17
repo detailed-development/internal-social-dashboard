@@ -348,7 +348,7 @@ router.delete('/:id/versions/:versionId', async (req, res) => {
 // POST /api/plugins → create a plugin or upload a zip
 router.post('/', upload.single('file'), async (req, res) => {
   const prisma = req.app.get('prisma')
-  const { title, category, description, content, downloadUrl, fileName, fileType } = req.body
+  const { title, category, description, content, downloadUrl, fileName, fileType, version } = req.body
 
   if (!title) {
     if (req.file) unlinkIfExists(req.file.path)
@@ -361,6 +361,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         title,
         category: category || 'General',
         description: description || null,
+        version: version || null,
         content: req.file ? null : (content || null),
         downloadUrl: req.file
           ? `${LOCAL_FILE_PREFIX}${req.file.filename}`
@@ -384,7 +385,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 // PATCH /api/plugins/:id → update fields, optionally replace zip
 router.patch('/:id', upload.single('file'), async (req, res) => {
   const prisma = req.app.get('prisma')
-  const { title, category, description, content, downloadUrl, fileName, fileType } = req.body
+  const { title, category, description, content, downloadUrl, fileName, fileType, version } = req.body
 
   try {
     const existing = await prisma.plugin.findUnique({
@@ -404,6 +405,7 @@ router.patch('/:id', upload.single('file'), async (req, res) => {
         ...(title !== undefined && { title }),
         ...(category !== undefined && { category }),
         ...(description !== undefined && { description }),
+        ...(version !== undefined && { version }),
         ...(req.file
           ? {
               content: null,
