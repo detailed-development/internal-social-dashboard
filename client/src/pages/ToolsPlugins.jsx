@@ -429,7 +429,14 @@ export default function ToolsPlugins() {
       setFormOpen(false)
       setEditing(null)
     } catch (err) {
-      alert(err?.response?.data?.error || 'Failed to save plugin.')
+      const status = err?.response?.status
+      const serverMsg = err?.response?.data?.error
+      const parts = [
+        serverMsg || err?.message || 'Failed to save plugin.',
+        status ? `(HTTP ${status})` : err?.code ? `(${err.code})` : null,
+      ].filter(Boolean)
+      console.error('[plugin save failed]', err)
+      alert(parts.join(' '))
     }
   }
 

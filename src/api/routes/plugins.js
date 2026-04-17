@@ -164,6 +164,7 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
 
     res.status(201).json(withSignedDownloadUrl(plugin))
   } catch (err) {
+    console.error('[plugins/bunny] upload failed:', err)
     if (plugin?.id) {
       await prisma.plugin.update({
         where: { id: plugin.id },
