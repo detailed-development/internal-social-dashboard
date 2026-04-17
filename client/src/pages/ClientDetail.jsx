@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  getClient, getBuzzwords, getWebAnalytics, updateClient,
-  getGa4Properties, addSocialAccount, removeSocialAccount, getMessages, lookupSocialHandle,
-  getClientOverview, getContentPillars, assignPostToPillar, unassignPostFromPillar,
+  updateClient,
+  getGa4Properties, addSocialAccount, removeSocialAccount, lookupSocialHandle,
   getPlatformAppPassword, updatePlatformAppPassword,
 } from '../api'
 import StatCard from '../components/StatCard'
@@ -20,6 +19,7 @@ import StyleGuidePanel from '../components/StyleGuidePanel'
 import RuleInsightsPanel from '../components/analytics/RuleInsightsPanel'
 import FreshnessBadges from '../components/analytics/FreshnessBadges'
 import { useTheme } from '../ThemeContext'
+import { useClientDetail } from '../hooks/useClientDetail'
 
 function fmt(n) {
   if (!n) return '0'
@@ -28,44 +28,56 @@ function fmt(n) {
   return String(n)
 }
 
-const BUZZ_SKIP = new Set([
-  'getting','making','going','being','having','doing','saying','taking','looking',
-  'coming','giving','using','trying','seeing','wanting','telling','working',
-  'calling','asking','putting','turning','keeping','letting','seeming','showing',
-  'feeling','leaving','standing','moving','passing','bringing','allowing',
-  'starting','ending','thinking','following','running','setting','reading',
-  'spending','living','leading','playing','checking','opening','closing',
-  'creating','building','helping','sharing','finding','joining','posting',
-  'loving','caring','growing','learning','winning','watching','waiting',
-  'like','just','this','that','with','from','your','have','will','more',
-  'about','what','when','they','them','their','been','also','into','some',
-  'there','which','would','could','should','these','those','after','over',
-  'only','then','other','time','very','such','much','each','even','back',
-])
-
 export default function ClientDetail() {
   const { slug } = useParams()
   const { theme } = useTheme()
-  const [client, setClient] = useState(null)
-  const [overview, setOverview] = useState(null)
-  const [buzzwords, setBuzzwords] = useState([])
-  const [webData, setWebData] = useState(null)
-  const [messages, setMessages] = useState([])
-  const [messagesLoading, setMessagesLoading] = useState(false)
-  const [tab, setTab] = useState('Social')
-
-  function persistTab(s, value) {
-    try { localStorage.setItem(`ncm_tab_${s}`, value) } catch {}
-  }
-  function savedTab(s) {
-    try { return localStorage.getItem(`ncm_tab_${s}`) } catch { return null }
-  }
-  function persistTabVisibility(s, value) {
-    try { localStorage.setItem(`ncm_tab_vis_${s}`, JSON.stringify(value)) } catch {}
-  }
-  function savedTabVisibility(s) {
-    try { return JSON.parse(localStorage.getItem(`ncm_tab_vis_${s}`) || 'null') } catch { return null }
-  }
+  const {
+    client,
+    setClient,
+    refreshClient,
+    overview,
+    webData,
+    messages,
+    messagesLoading,
+    tab,
+    showSocial,
+    setShowSocial,
+    tabVisibility,
+    collapsedPlatforms,
+    pillarFilter,
+    pillars,
+    tagOpenPostId,
+    chartTab,
+    buzzOpen,
+    platformsOpen,
+    setActiveTab,
+    setPillars,
+    setPillarFilter,
+    setTagOpenPostId,
+    setChartTab,
+    setBuzzOpen,
+    setPlatformsOpen,
+    setCollapsedPlatforms,
+    applyPostPillarChange,
+    handleTagPost,
+    handleToggleTab,
+    allPosts,
+    totalLikes,
+    totalComments,
+    totalReach,
+    totalFollowers,
+    engagementRate,
+    platforms,
+    visibleTabs,
+    filteredBuzz,
+    chartData,
+    chartPostTypeBreakdown,
+    chartTabs,
+    activePillarForChart,
+    hasMessagingAccounts,
+    hasTrendData,
+    hasCharts,
+  } = useClientDetail(slug)
 
   // GA4 modal state
   const [ga4ModalOpen, setGa4ModalOpen] = useState(false)
@@ -87,25 +99,6 @@ export default function ClientDetail() {
   const [editHandlePreview, setEditHandlePreview] = useState(null)
   const [editHandlePreviewLoading, setEditHandlePreviewLoading] = useState(false)
 
-  // Platform collapse state
-  const [collapsedPlatforms, setCollapsedPlatforms] = useState({})
-
-  // Content pillar filter (shared — drives both post list AND charts/analytics)
-  const [pillarFilter, setPillarFilter] = useState(null)
-
-  // Pillars lifted for post tagging + chart filter
-  const [pillars, setPillars] = useState([])
-  const [tagOpenPostId, setTagOpenPostId] = useState(null)
-
-  // Charts
-  const [chartTab, setChartTab] = useState('account')
-
-  // Buzzwords collapsed on initial load
-  const [buzzOpen, setBuzzOpen] = useState(false)
-
-  // Social Platforms panel opened on initial load
-  const [platformsOpen, setPlatformsOpen] = useState(true)
-
   // App Password state (per-platform, modal-scoped)
   const [appPasswordData, setAppPasswordData] = useState(null)
   const [appPasswordRevealed, setAppPasswordRevealed] = useState(false)
@@ -117,13 +110,6 @@ export default function ClientDetail() {
 
   // Settings panel state
   const [showSettings, setShowSettings] = useState(false)
-  const [showSocial, setShowSocial] = useState(false)
-  const [tabVisibility, setTabVisibility] = useState({
-    Messages: true,
-    'Website Analytics': true,
-    'AI Insights': true,
-    'Style Guide': true,
-  })
   const [socialPlatform, setSocialPlatform] = useState('INSTAGRAM')
   const [socialHandle, setSocialHandle] = useState('')
   const [addingSocial, setAddingSocial] = useState(false)
@@ -133,64 +119,20 @@ export default function ClientDetail() {
   const settingsRef = useRef(null)
 
   useEffect(() => {
-    setClient(null)
-    setOverview(null)
-    setWebData(null)
-    setMessages([])
     setShowSettings(false)
     setSocialHandle('')
     setAddSocialError('')
     setIsEditingGa(false)
     setSaveError('')
-    setPillars([])
     setSocialModal(null)
     setIsEditingHandle(false)
-
-    const savedVis = savedTabVisibility(slug)
-    if (savedVis) {
-      setTabVisibility(prev => ({ ...prev, ...savedVis }))
-    } else {
-      setTabVisibility({ Messages: true, 'Website Analytics': true, 'AI Insights': true, 'Style Guide': true })
-    }
-
-    const clientPromise = getClient(slug)
-    getClientOverview(slug).then(setOverview).catch(() => {})
-    getBuzzwords(slug).then(setBuzzwords).catch(() => {})
-    getWebAnalytics(slug).then(setWebData).catch(() => {})
-
-    clientPromise
-      .then(clientData => {
-        setClient(clientData)
-        setGaPropertyIdInput(clientData.gaPropertyId || '')
-        setWebsiteUrlInput(clientData.websiteUrl || '')
-        const hasSocial = clientData.socialAccounts.length > 0
-        setShowSocial(hasSocial)
-        const hasMsgs = clientData.socialAccounts.some(a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK')
-        const vis = savedVis || { Messages: true, 'Website Analytics': true, 'AI Insights': true, 'Style Guide': true }
-        const isTabVisible = (t) => {
-          if (t === 'Social') return hasSocial
-          if (t === 'Messages') return hasMsgs && vis.Messages
-          return vis[t]
-        }
-        const stored = savedTab(slug)
-        const validTabs = ['Social', 'Messages', 'Website Analytics', 'AI Insights', 'Style Guide']
-        const resolvedTab = stored && validTabs.includes(stored) && isTabVisible(stored)
-          ? stored
-          : validTabs.find(isTabVisible) || 'Website Analytics'
-        setTab(resolvedTab)
-
-        if (hasSocial && clientData.socialAccounts.some(a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK')) {
-          setMessagesLoading(true)
-          getMessages(slug, { includeHidden: true })
-            .then(setMessages)
-            .catch(() => {})
-            .finally(() => setMessagesLoading(false))
-        }
-
-        getContentPillars(clientData.id).then(setPillars).catch(() => {})
-      })
-      .catch(() => {})
   }, [slug])
+
+  useEffect(() => {
+    if (!client) return
+    setGaPropertyIdInput(client.gaPropertyId || '')
+    setWebsiteUrlInput(client.websiteUrl || '')
+  }, [client])
 
   // Close settings on outside click
   useEffect(() => {
@@ -320,12 +262,11 @@ export default function ClientDetail() {
     setAddSocialError('')
     try {
       await addSocialAccount(slug, socialPlatform, handle)
-      const refreshed = await getClient(slug)
-      setClient(refreshed)
+      await refreshClient()
       setSocialHandle('')
       setHandlePreview(null)
       setShowSocial(true)
-      setTab('Social')
+      setActiveTab('Social')
     } catch (err) {
       setAddSocialError(err?.response?.data?.error || 'Failed to add account.')
     } finally {
@@ -341,8 +282,7 @@ export default function ClientDetail() {
     setEditHandleError('')
     try {
       await addSocialAccount(slug, socialModal.platform, handle)
-      const refreshed = await getClient(slug)
-      setClient(refreshed)
+      await refreshClient()
       setSocialModal(null)
       setIsEditingHandle(false)
       setEditHandleInput('')
@@ -359,10 +299,15 @@ export default function ClientDetail() {
     if (!window.confirm(`Remove @${socialModal.handle} from this client?`)) return
     try {
       await removeSocialAccount(slug, socialModal.id)
+      const nextHasSocial = client.socialAccounts.length > 1
       setClient(prev => prev && ({
         ...prev,
         socialAccounts: prev.socialAccounts.filter(a => a.id !== socialModal.id),
       }))
+      setShowSocial(nextHasSocial)
+      if (!nextHasSocial && (tab === 'Social' || tab === 'Messages')) {
+        setActiveTab('Website Analytics')
+      }
       setSocialModal(null)
       setIsEditingHandle(false)
     } catch (err) {
@@ -407,163 +352,9 @@ export default function ClientDetail() {
     if (prop.websiteUrl) setWebsiteUrlInput(prop.websiteUrl)
   }
 
-  function handleToggleSocial(enabled) {
-    setShowSocial(enabled)
-    if (!enabled && (tab === 'Social' || tab === 'Messages')) { setTab('Website Analytics'); persistTab(slug, 'Website Analytics') }
-    if (enabled && tab === 'Website Analytics') { setTab('Social'); persistTab(slug, 'Social') }
-  }
-
-  function handleToggleTab(tabName, enabled) {
-    if (tabName === 'Social') return handleToggleSocial(enabled)
-    const next = { ...tabVisibility, [tabName]: enabled }
-    setTabVisibility(next)
-    persistTabVisibility(slug, next)
-    if (!enabled && tab === tabName) {
-      const fallback = ['Social', 'Messages', 'Website Analytics', 'AI Insights', 'Style Guide'].find(t => {
-        if (t === tabName) return false
-        if (t === 'Social') return showSocial
-        if (t === 'Messages') return hasMessagingAccounts && next.Messages
-        return next[t]
-      })
-      if (fallback) { setTab(fallback); persistTab(slug, fallback) }
-    }
-  }
-
-  function applyPostPillarChange(pillarId, postId, isAssigned) {
-    setClient(prev => prev && ({
-      ...prev,
-      socialAccounts: prev.socialAccounts.map(a => ({
-        ...a,
-        posts: a.posts.map(p => p.id !== postId ? p : {
-          ...p,
-          pillars: isAssigned
-            ? (p.pillars || []).filter(pa => pa.contentPillarId !== pillarId)
-            : [...(p.pillars || []), { contentPillarId: pillarId }],
-        }),
-      })),
-    }))
-  }
-
-  async function handleTagPost(pillarId, postId, isAssigned) {
-    try {
-      if (isAssigned) await unassignPostFromPillar(pillarId, postId)
-      else await assignPostToPillar(pillarId, postId)
-      applyPostPillarChange(pillarId, postId, isAssigned)
-    } catch {}
-    setTagOpenPostId(null)
-  }
-
   if (!client) {
     return <div className={`p-4 sm:p-8 text-sm ${theme.muted}`}>Loading...</div>
   }
-
-  const allPosts = client.socialAccounts
-    .flatMap(a => a.posts.map(p => ({ ...p, platform: a.platform, accountHandle: a.handle })))
-    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-
-  const ov = overview?.summary
-  // When a pillar filter is active, recompute stat totals from the filtered post set
-  // so the stat cards, engagement rate, and charts all agree with the selected pillar.
-  const filteredPosts = pillarFilter
-    ? allPosts.filter(p => p.pillars?.some(pa => pa.contentPillarId === pillarFilter))
-    : allPosts
-  const totalLikes     = pillarFilter
-    ? filteredPosts.reduce((s, p) => s + (p.metrics?.[0]?.likes || 0), 0)
-    : (ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.likes, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.likes || 0), 0))
-  const totalComments  = pillarFilter
-    ? filteredPosts.reduce((s, p) => s + (p.metrics?.[0]?.commentsCount || 0), 0)
-    : (ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.comments, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.commentsCount || 0), 0))
-  const totalReach     = pillarFilter
-    ? filteredPosts.reduce((s, p) => s + (p.metrics?.[0]?.reach || 0), 0)
-    : (ov ? ov.totalReach : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.reach || 0), 0))
-  const totalShares    = pillarFilter
-    ? filteredPosts.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0)
-    : (ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.shares, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0))
-  const totalSaves     = pillarFilter
-    ? filteredPosts.reduce((s, p) => s + (p.metrics?.[0]?.saves || 0), 0)
-    : (ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.saves, 0) : allPosts.reduce((s, p) => s + (p.metrics?.[0]?.saves || 0), 0))
-  const totalFollowers = ov ? (overview.chartData?.platformTotals || []).reduce((s, p) => s + p.followers, 0) : client.socialAccounts.reduce((s, a) => s + (a.followerCount || 0), 0)
-  const totalEngagement = pillarFilter
-    ? (totalLikes + totalComments + totalShares + totalSaves)
-    : (ov ? ov.totalEngagement : (totalLikes + totalComments + totalShares + totalSaves))
-  const postsForRate = pillarFilter ? filteredPosts.length : allPosts.length
-  const engagementRate = totalFollowers > 0 ? ((totalEngagement / (postsForRate || 1)) / totalFollowers * 100) : 0
-
-  // Group accounts by platform
-  const platforms = {}
-  for (const account of client.socialAccounts) {
-    const key = account.platform
-    if (!platforms[key]) platforms[key] = { accounts: [], posts: [] }
-    platforms[key].accounts.push(account)
-    for (const post of account.posts) {
-      platforms[key].posts.push({ ...post, platform: key, accountHandle: account.handle })
-    }
-  }
-  for (const p of Object.values(platforms)) {
-    p.posts.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-  }
-
-  // Base chart data (server overview or local)
-  const baseChartData = overview?.chartData?.platformTotals
-    ? overview.chartData.platformTotals.map(p => ({ name: p.handle, likes: p.likes, shares: p.shares, saves: p.saves }))
-    : client.socialAccounts.map(a => ({
-        name: a.handle,
-        likes: a.posts.reduce((s, p) => s + (p.metrics?.[0]?.likes || 0), 0),
-        shares: a.posts.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0),
-        saves: a.posts.reduce((s, p) => s + (p.metrics?.[0]?.saves || 0), 0),
-      }))
-
-  // Chart data filtered by pillar (reuses filteredPosts computed above)
-  const chartData = pillarFilter
-    ? client.socialAccounts.map(a => {
-        const fp = a.posts.filter(p => p.pillars?.some(pa => pa.contentPillarId === pillarFilter))
-        return {
-          name: a.handle,
-          likes: fp.reduce((s, p) => s + (p.metrics?.[0]?.likes || 0), 0),
-          shares: fp.reduce((s, p) => s + (p.metrics?.[0]?.shares || 0), 0),
-          saves: fp.reduce((s, p) => s + (p.metrics?.[0]?.saves || 0), 0),
-        }
-      })
-    : baseChartData
-
-  const chartPostTypeBreakdown = pillarFilter
-    ? (() => {
-        const map = {}
-        for (const p of filteredPosts) {
-          const key = `${p.platform}:${p.mediaType || 'POST'}`
-          if (!map[key]) map[key] = { type: p.mediaType || 'POST', platform: p.platform, total: 0, count: 0 }
-          map[key].total += (p.metrics?.[0]?.likes || 0) + (p.metrics?.[0]?.commentsCount || 0)
-          map[key].count++
-        }
-        return Object.values(map).map(r => ({ ...r, avgEngagement: r.count > 0 ? Math.round(r.total / r.count) : 0 }))
-      })()
-    : (overview?.chartData?.postTypeBreakdown || [])
-
-  const hasTrendData = !pillarFilter && (overview?.chartData?.dailyEngagement?.length > 0)
-  const hasCharts = chartData.length > 0 || chartPostTypeBreakdown.length > 0 || hasTrendData
-
-  const hasMessagingAccounts = client.socialAccounts.some(
-    a => a.platform === 'INSTAGRAM' || a.platform === 'FACEBOOK'
-  )
-  const visibleTabs = [
-    ...(showSocial ? ['Social'] : []),
-    ...(hasMessagingAccounts && tabVisibility.Messages ? ['Messages'] : []),
-    ...(tabVisibility['Website Analytics'] ? ['Website Analytics'] : []),
-    ...(tabVisibility['AI Insights'] ? ['AI Insights'] : []),
-    ...(tabVisibility['Style Guide'] ? ['Style Guide'] : []),
-  ]
-
-  // Filtered buzzwords — real dictionary words only
-  const filteredBuzz = buzzwords.filter(b => b.word.length >= 3 && !BUZZ_SKIP.has(b.word.toLowerCase()))
-
-  // Chart tab options
-  const chartTabs = [
-    { key: 'account', label: 'By Account', available: chartData.length > 0 },
-    { key: 'type', label: 'Post Type', available: chartPostTypeBreakdown.length > 0 },
-    { key: 'trend', label: 'Trend', available: hasTrendData },
-  ].filter(t => t.available)
-
-  const activePillarForChart = pillars.find(p => p.id === pillarFilter)
 
   return (
     <div className="p-4 sm:p-8">
@@ -668,7 +459,9 @@ export default function ClientDetail() {
                       className={`flex-1 min-w-[4rem] rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors ${
                         socialPlatform === p.value
                           ? p.active
-                          : `border-gray-200 text-gray-500 hover:bg-gray-50 ${theme.card.includes('gray-700') ? 'bg-gray-700' : 'bg-white'}`
+                          : theme.id === 'dark'
+                            ? 'border-neutral-700 bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
+                            : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
                       }`}
                     >
                       {p.label}
@@ -1072,7 +865,7 @@ export default function ClientDetail() {
         {visibleTabs.map(t => (
           <button
             key={t}
-            onClick={() => { setTab(t); persistTab(slug, t) }}
+            onClick={() => setActiveTab(t)}
             className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               tab === t ? theme.tabActive : theme.tabInactive
             }`}

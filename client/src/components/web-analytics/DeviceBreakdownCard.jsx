@@ -1,11 +1,10 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTheme } from '../../ThemeContext'
 
-const DEVICE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444']
-
 export default function DeviceBreakdownCard({ deviceData, totalDeviceSessions }) {
   const { theme } = useTheme()
   const c = theme.chart
+  const deviceColors = [c.line1, c.line2, c.line3, '#f87171']
 
   if (deviceData.length === 0) {
     return null
@@ -28,7 +27,7 @@ export default function DeviceBreakdownCard({ deviceData, totalDeviceSessions })
               paddingAngle={2}
             >
               {deviceData.map((_, index) => (
-                <Cell key={index} fill={DEVICE_COLORS[index % DEVICE_COLORS.length]} />
+                <Cell key={index} fill={deviceColors[index % deviceColors.length]} />
               ))}
             </Pie>
             <Tooltip contentStyle={{ backgroundColor: c.tooltipBg, borderColor: c.grid }} />
@@ -41,7 +40,7 @@ export default function DeviceBreakdownCard({ deviceData, totalDeviceSessions })
               <div className="flex items-center gap-2">
                 <span
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: DEVICE_COLORS[index % DEVICE_COLORS.length] }}
+                  style={{ backgroundColor: deviceColors[index % deviceColors.length] }}
                 />
                 <span className={theme.body}>{device.name}</span>
               </div>

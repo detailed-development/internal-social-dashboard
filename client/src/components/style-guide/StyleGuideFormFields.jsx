@@ -7,7 +7,7 @@ function FieldLabel({ children }) {
 
 function TextInput({ value, onChange, placeholder }) {
   const { theme } = useTheme()
-  const inputClass = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${theme.input}`
+  const inputClass = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${theme.focusRing} ${theme.input}`
 
   return (
     <input
@@ -22,7 +22,7 @@ function TextInput({ value, onChange, placeholder }) {
 
 function TextArea({ value, onChange, placeholder, rows, mono = false }) {
   const { theme } = useTheme()
-  const className = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-y ${theme.input}${mono ? ' font-mono text-xs' : ''}`
+  const className = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y ${theme.focusRing} ${theme.input}${mono ? ' font-mono text-xs' : ''}`
 
   return (
     <textarea

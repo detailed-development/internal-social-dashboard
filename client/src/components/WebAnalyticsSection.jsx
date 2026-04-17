@@ -38,21 +38,9 @@ export default function WebAnalyticsSection({ data }) {
     const stats = [
       { label: 'Sessions', value: formatNumber(totals.sessions) },
       { label: 'Users', value: formatNumber(totals.users) },
-      { label: 'New Users', value: formatNumber(totals.newUsers) },
       { label: 'Pageviews', value: formatNumber(totals.pageviews) },
-      {
-        label: 'Engagement Rate',
-        value: totals.engagementRate != null ? `${(totals.engagementRate * 100).toFixed(1)}%` : '—',
-      },
-      {
-        label: 'Avg Bounce Rate',
-        value: totals.avgBounceRate != null ? `${(totals.avgBounceRate * 100).toFixed(1)}%` : '—',
-      },
       { label: 'Avg Session', value: formatDuration(totals.avgSessionDuration) },
-      {
-        label: 'Pages / Session',
-        value: totals.sessions ? (totals.pageviews / totals.sessions).toFixed(1) : '—',
-      },
+      { label: 'Bounce Rate', value: totals.avgBounceRate != null ? `${(totals.avgBounceRate * 100).toFixed(1)}%` : '—' },
     ]
 
     const chartData = daily.map((row) => ({
@@ -103,22 +91,34 @@ export default function WebAnalyticsSection({ data }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className={`text-sm font-semibold ${theme.body}`}>Website Analytics (Last 30 Days)</h3>
-        {data.websiteUrl && (
-          <a
-            href={data.websiteUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={`text-xs hover:underline ${theme.detailsLink}`}
-          >
-            {data.websiteUrl.replace('https://', '')}
-          </a>
-        )}
+    <div className="space-y-4">
+      <div className={`border rounded-xl p-5 sm:p-6 ${theme.card}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className={`text-sm font-semibold ${theme.body}`}>Website Analytics</h3>
+            <p className={`text-xs mt-1 ${theme.subtext}`}>Last 30 days</p>
+          </div>
+          {data.websiteUrl && (
+            <a
+              href={data.websiteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`text-xs hover:underline ${theme.detailsLink}`}
+            >
+              {data.websiteUrl.replace(/^https?:\/\//, '')}
+            </a>
+          )}
+        </div>
+
+        <div className={`mt-5 pt-5 border-t ${theme.cardDivider}`}>
+          <WebAnalyticsStatsGrid stats={derived.stats} compact />
+        </div>
+
+        <div className={`mt-5 pt-5 border-t ${theme.cardDivider}`}>
+          <TopLandingPagesCard pages={derived.pages} baseUrl={data.websiteUrl} embedded />
+        </div>
       </div>
 
-      <WebAnalyticsStatsGrid stats={derived.stats} />
       <WebAnalyticsTrendChart chartData={derived.chartData} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -129,7 +129,6 @@ export default function WebAnalyticsSection({ data }) {
         <TrafficSourcesCard sourceData={derived.sourceData} />
       </div>
 
-      <TopLandingPagesCard pages={derived.pages} />
     </div>
   )
 }

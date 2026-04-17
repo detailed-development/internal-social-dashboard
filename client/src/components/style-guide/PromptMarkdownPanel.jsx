@@ -10,7 +10,7 @@ export default function PromptMarkdownPanel({
   onDownload,
 }) {
   const { theme } = useTheme()
-  const textareaClass = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-y ${theme.input} font-mono text-xs`
+  const textareaClass = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y ${theme.focusRing} ${theme.input} font-mono text-xs`
 
   return (
     <div className="space-y-3">
@@ -41,7 +41,7 @@ export default function PromptMarkdownPanel({
             type="button"
             onClick={onDownload}
             disabled={!promptMarkdown}
-            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-40"
+            className={`text-xs font-medium ${theme.detailsLink} disabled:opacity-40`}
           >
             Download .md
           </button>

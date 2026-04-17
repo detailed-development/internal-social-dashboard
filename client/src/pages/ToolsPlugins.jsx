@@ -1,25 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTheme } from '../ThemeContext'
-import {
-  getPlugins,
-  createPlugin,
-  updatePlugin,
-  deletePlugin,
-  getBunnyStatus,
-  uploadPluginToBunny,
-  uploadPluginVersionToBunny,
-  deletePluginVersion,
-} from '../api'
-
-function groupByCategory(plugins) {
-  const map = {}
-  for (const p of plugins) {
-    const key = p.category || 'General'
-    if (!map[key]) map[key] = []
-    map[key].push(p)
-  }
-  return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]))
-}
+import { usePlugins } from '../hooks/usePlugins'
 
 function inferFileType(name = '') {
   const parts = name.split('.')
@@ -612,98 +593,17 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
 
 export default function ToolsPlugins() {
   const { theme } = useTheme()
-  const [plugins, setPlugins] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [formOpen, setFormOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [filterCategory, setFilterCategory] = useState('')
-  const [bunnyAvailable, setBunnyAvailable] = useState(false)
-
-  useEffect(() => {
-    getPlugins()
-      .then(setPlugins)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-    getBunnyStatus()
-      .then(s => setBunnyAvailable(Boolean(s?.configured)))
-      .catch(() => setBunnyAvailable(false))
-  }, [])
-
-  const grouped = useMemo(() => {
-    const filtered = filterCategory
-      ? plugins.filter(p => (p.category || 'General') === filterCategory)
-      : plugins
-    return groupByCategory(filtered)
-  }, [plugins, filterCategory])
-
-  const allCategories = useMemo(() => {
-    const set = new Set(plugins.map(p => p.category || 'General'))
-    return Array.from(set).sort()
-  }, [plugins])
-
-  async function handleSave(data) {
-    const { useBunny, onProgress, ...payload } = data
-    try {
-      if (editing) {
-        const updated = await updatePlugin(editing.id, payload)
-        setPlugins(list => list.map(p => (p.id === updated.id ? updated : p)))
-      } else if (useBunny) {
-        const created = await uploadPluginToBunny(payload, onProgress)
-        setPlugins(list => [...list, created])
-      } else {
-        const created = await createPlugin(payload)
-        setPlugins(list => [...list, created])
-      }
-      setFormOpen(false)
-      setEditing(null)
-    } catch (err) {
-      const status = err?.response?.status
-      const serverMsg = err?.response?.data?.error
-      const parts = [
-        serverMsg || err?.message || 'Failed to save plugin.',
-        status ? `(HTTP ${status})` : err?.code ? `(${err.code})` : null,
-      ].filter(Boolean)
-      console.error('[plugin save failed]', err)
-      alert(parts.join(' '))
-    }
-  }
-
-  async function handleDelete(id) {
-    try {
-      await deletePlugin(id)
-      setPlugins(list => list.filter(p => p.id !== id))
-    } catch {
-      alert('Failed to delete plugin.')
-    }
-  }
-
-  async function handleUploadVersion(id, data) {
-    const { onProgress, ...rest } = data
-    try {
-      const updated = await uploadPluginVersionToBunny(id, rest, onProgress)
-      setPlugins(list => list.map(p => (p.id === updated.id ? updated : p)))
-    } catch (err) {
-      const status = err?.response?.status
-      const serverMsg = err?.response?.data?.error
-      const parts = [
-        serverMsg || err?.message || 'Failed to upload version.',
-        status ? `(HTTP ${status})` : err?.code ? `(${err.code})` : null,
-      ].filter(Boolean)
-      console.error('[plugin version upload failed]', err)
-      alert(parts.join(' '))
-      throw err
-    }
-  }
-
-  async function handleDeleteVersion(id, versionId) {
-    try {
-      const updated = await deletePluginVersion(id, versionId)
-      setPlugins(list => list.map(p => (p.id === updated.id ? updated : p)))
-    } catch (err) {
-      const serverMsg = err?.response?.data?.error
-      alert(serverMsg || err?.message || 'Failed to delete version.')
-    }
-  }
+  const {
+    plugins,
+    loading,
+    formOpen,
+    editing,
+    filterCategory,
+    bunnyAvailable,
+    grouped,
+    allCategories,
+    actions,
+  } = usePlugins()
 
   return (
     <div className="p-4 sm:p-8">
@@ -718,7 +618,7 @@ export default function ToolsPlugins() {
           {allCategories.length > 0 && (
             <select
               value={filterCategory}
-              onChange={e => setFilterCategory(e.target.value)}
+              onChange={e => actions.setFilterCategory(e.target.value)}
               className={`text-xs rounded-lg border px-2 py-1 focus:outline-none ${theme.input}`}
             >
               <option value="">All categories</option>
@@ -729,7 +629,7 @@ export default function ToolsPlugins() {
           )}
           <button
             type="button"
-            onClick={() => { setEditing(null); setFormOpen(true) }}
+            onClick={actions.openCreateForm}
             className={`text-sm px-3 py-1.5 rounded-lg font-semibold transition-colors ${theme.btnPrimary}`}
           >
             + New
@@ -742,8 +642,8 @@ export default function ToolsPlugins() {
           <PluginForm
             initial={editing}
             theme={theme}
-            onCancel={() => { setFormOpen(false); setEditing(null) }}
-            onSave={handleSave}
+            onCancel={actions.closeForm}
+            onSave={actions.handleSave}
             bunnyAvailable={bunnyAvailable}
           />
         </div>
@@ -776,10 +676,10 @@ export default function ToolsPlugins() {
                     plugin={p}
                     theme={theme}
                     bunnyAvailable={bunnyAvailable}
-                    onEdit={() => { setEditing(p); setFormOpen(true) }}
-                    onDelete={handleDelete}
-                    onUploadVersion={handleUploadVersion}
-                    onDeleteVersion={handleDeleteVersion}
+                    onEdit={() => actions.openEditForm(p)}
+                    onDelete={actions.handleDelete}
+                    onUploadVersion={actions.handleUploadVersion}
+                    onDeleteVersion={actions.handleDeleteVersion}
                   />
                 ))}
               </div>
