@@ -94,8 +94,10 @@ export const deletePluginVersion = (id, versionId) =>
   api.delete(`/plugins/${id}/versions/${versionId}`).then(r => r.data)
 
 // Platform App Passwords
-export const getPlatformAppPassword = (platform) => api.get(`/platform-app-passwords/${platform}`).then(r => r.data)
-export const updatePlatformAppPassword = (platform, data) => api.put(`/platform-app-passwords/${platform}`, data).then(r => r.data)
+export const getPlatformAppPassword = (slug, platform) => api.get(`/platform-app-passwords/${slug}/${platform}`).then(r => r.data)
+export const updatePlatformAppPassword = (slug, platform, data) => api.put(`/platform-app-passwords/${slug}/${platform}`, data).then(r => r.data)
+export const deletePlatformAppPasswordHistory = (slug, platform, historyId) =>
+  api.delete(`/platform-app-passwords/${slug}/${platform}/history/${historyId}`).then(r => r.data)
 
 // AI features
 export const generateWeeklyInsights = (params) => api.post('/ai/weekly-insights', params).then(r => r.data)

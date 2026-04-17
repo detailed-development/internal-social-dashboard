@@ -45,6 +45,7 @@ model Client {
   contentPillars       ContentPillar[]
   reportStyles         ClientReportStyle[]
   styleGuide           ClientStyleGuide?
+  platformAppPasswords PlatformAppPassword[]
 
   @@map("clients")
 }
@@ -560,21 +561,25 @@ model PluginVersion {
   @@map("plugin_versions")
 }
 
-// Platform-wide "App Password" per social-account platform. Locked/obfuscated
-// in the UI by default; each edit writes a new history row so we can display
-// who changed it and when.
+// App passwords are scoped per client + platform. Locked/obfuscated in the UI
+// by default; each edit writes a new history row so we can display who changed
+// it and when.
 model PlatformAppPassword {
   id        String                       @id @default(cuid())
-  platform  Platform                     @unique
+  clientId  String                       @map("client_id")
+  platform  Platform
   password  String?
   updatedAt DateTime                     @updatedAt @map("updated_at")
+  client    Client                       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   history   PlatformAppPasswordHistory[]
 
+  @@unique([clientId, platform])
+  @@index([platform])
   @@map("platform_app_passwords")
 }
 
 model PlatformAppPasswordHistory {
-  id                    String              @id @default(cuid())
+  id        String                       @id @default(cuid())
   platformAppPasswordId String              @map("platform_app_password_id")
   platform              Platform
   password              String?
@@ -582,6 +587,6 @@ model PlatformAppPasswordHistory {
   changedAt             DateTime            @default(now()) @map("changed_at")
   parent                PlatformAppPassword @relation(fields: [platformAppPasswordId], references: [id], onDelete: Cascade)
 
-  @@index([platform, changedAt(sort: Desc)])
+  @@index([platformAppPasswordId, changedAt(sort: Desc)])
   @@map("platform_app_password_history")
 }

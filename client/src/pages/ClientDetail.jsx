@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import {
   updateClient,
   getGa4Properties, addSocialAccount, removeSocialAccount, lookupSocialHandle,
-  getPlatformAppPassword, updatePlatformAppPassword,
+  getPlatformAppPassword, updatePlatformAppPassword, deletePlatformAppPasswordHistory,
 } from '../api'
 import StatCard from '../components/StatCard'
 import PostCard from '../components/PostCard'
@@ -99,7 +99,7 @@ export default function ClientDetail() {
   const [editHandlePreview, setEditHandlePreview] = useState(null)
   const [editHandlePreviewLoading, setEditHandlePreviewLoading] = useState(false)
 
-  // App Password state (per-platform, modal-scoped)
+  // App Password state (per-client + per-platform, modal-scoped)
   const [appPasswordData, setAppPasswordData] = useState(null)
   const [appPasswordRevealed, setAppPasswordRevealed] = useState(false)
   const [appPasswordEditing, setAppPasswordEditing] = useState(false)
@@ -107,6 +107,8 @@ export default function ClientDetail() {
   const [appPasswordChangedBy, setAppPasswordChangedBy] = useState('')
   const [appPasswordSaving, setAppPasswordSaving] = useState(false)
   const [appPasswordError, setAppPasswordError] = useState('')
+  const [appPasswordDeletingId, setAppPasswordDeletingId] = useState('')
+  const [appPasswordHistoryHoverId, setAppPasswordHistoryHoverId] = useState(null)
 
   // Settings panel state
   const [showSettings, setShowSettings] = useState(false)
@@ -209,13 +211,21 @@ export default function ClientDetail() {
       setAppPasswordRevealed(false)
       setAppPasswordEditing(false)
       setAppPasswordInput('')
+      setAppPasswordChangedBy('')
       setAppPasswordError('')
+      setAppPasswordDeletingId('')
+      setAppPasswordHistoryHoverId(null)
       return
     }
-    getPlatformAppPassword(socialModal.platform)
-      .then(data => setAppPasswordData(data))
+    getPlatformAppPassword(slug, socialModal.platform)
+      .then(data => {
+        setAppPasswordData(data)
+        setAppPasswordError('')
+        setAppPasswordDeletingId('')
+        setAppPasswordHistoryHoverId(null)
+      })
       .catch(() => setAppPasswordData(null))
-  }, [socialModal])
+  }, [slug, socialModal])
 
   async function handleSaveAppPassword(e) {
     e.preventDefault()
@@ -223,17 +233,36 @@ export default function ClientDetail() {
     setAppPasswordSaving(true)
     setAppPasswordError('')
     try {
-      const data = await updatePlatformAppPassword(socialModal.platform, {
+      const data = await updatePlatformAppPassword(slug, socialModal.platform, {
         password: appPasswordInput,
         changedBy: appPasswordChangedBy.trim() || null,
       })
       setAppPasswordData(data)
       setAppPasswordEditing(false)
       setAppPasswordInput('')
+      setAppPasswordChangedBy('')
     } catch (err) {
       setAppPasswordError(err?.response?.data?.error || 'Failed to save password.')
     } finally {
       setAppPasswordSaving(false)
+    }
+  }
+
+  async function handleDeleteAppPasswordHistory(historyEntry) {
+    if (!socialModal) return
+    const changedAt = new Date(historyEntry.changedAt).toLocaleString()
+    if (!window.confirm(`Remove the password version saved on ${changedAt}?`)) return
+
+    setAppPasswordDeletingId(historyEntry.id)
+    setAppPasswordError('')
+    try {
+      const data = await deletePlatformAppPasswordHistory(slug, socialModal.platform, historyEntry.id)
+      setAppPasswordData(data)
+      setAppPasswordHistoryHoverId(null)
+    } catch (err) {
+      setAppPasswordError(err?.response?.data?.error || 'Failed to remove password version.')
+    } finally {
+      setAppPasswordDeletingId('')
     }
   }
 
@@ -293,6 +322,8 @@ export default function ClientDetail() {
       setEditHandleLoading(false)
     }
   }
+
+  const previousAppPasswordHistory = appPasswordData?.history?.slice(1) || []
 
   async function handleRemovePendingAccount() {
     if (!socialModal || socialModal.tokenStatus !== 'PENDING') return
@@ -790,6 +821,7 @@ export default function ClientDetail() {
                   >
                     {appPasswordData?.password ? 'Update password' : 'Set password'}
                   </button>
+                  {appPasswordError && <p className="text-xs text-red-500">{appPasswordError}</p>}
                 </div>
               )}
 
@@ -830,25 +862,63 @@ export default function ClientDetail() {
                 </form>
               )}
 
-              {appPasswordData?.history?.length > 0 && (
+              {previousAppPasswordHistory.length > 0 && (
                 <div className="mt-4">
-                  <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] mb-1.5 ${theme.muted}`}>
-                    Version History
-                  </p>
-                  <ul className="space-y-1 max-h-32 overflow-y-auto">
-                    {appPasswordData.history.map(h => (
-                      <li
-                        key={h.id}
-                        className={`text-[11px] px-2 py-1 rounded ${theme.code} ${theme.body} flex items-center justify-between gap-2`}
-                      >
-                        <span className="truncate">
-                          {h.changedBy || 'Unknown user'}
-                        </span>
-                        <span className={theme.muted}>
-                          {new Date(h.changedAt).toLocaleString()}
-                        </span>
-                      </li>
-                    ))}
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.muted}`}>
+                      Previous Changes
+                    </p>
+                    <span className={`text-[10px] ${theme.muted}`}>Hover to preview or remove</span>
+                  </div>
+                  <ul className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                    {previousAppPasswordHistory.map(h => {
+                      const isHovered = appPasswordHistoryHoverId === h.id
+                      const isDeleting = appPasswordDeletingId === h.id
+                      return (
+                        <li
+                          key={h.id}
+                          tabIndex={0}
+                          onMouseEnter={() => setAppPasswordHistoryHoverId(h.id)}
+                          onMouseLeave={() => setAppPasswordHistoryHoverId(current => current === h.id ? null : current)}
+                          onFocus={() => setAppPasswordHistoryHoverId(h.id)}
+                          onBlur={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget)) {
+                              setAppPasswordHistoryHoverId(current => current === h.id ? null : current)
+                            }
+                          }}
+                          className={`text-[11px] px-2 py-1.5 rounded border outline-none transition-colors ${theme.code} ${theme.body} ${isHovered ? theme.cardDivider : 'border-transparent'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate">
+                              {h.changedBy || 'Unknown user'}
+                            </span>
+                            <span className={`shrink-0 ${theme.muted}`}>
+                              {new Date(h.changedAt).toLocaleString()}
+                            </span>
+                          </div>
+                          {isHovered && (
+                            <div className={`mt-2 rounded-md border px-2 py-2 ${theme.code} ${theme.cardDivider}`}>
+                              <p className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.muted}`}>
+                                Saved Value
+                              </p>
+                              <div className={`font-mono text-[11px] break-all ${theme.codeText || theme.body}`}>
+                                {h.password || <span className={theme.muted}>Empty password</span>}
+                              </div>
+                              <div className="mt-2 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAppPasswordHistory(h)}
+                                  disabled={!!appPasswordDeletingId}
+                                  className={`text-[10px] px-2 py-1 rounded border font-semibold transition-colors ${theme.btnCancel}`}
+                                >
+                                  {isDeleting ? 'Removing…' : 'Remove version'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )}
