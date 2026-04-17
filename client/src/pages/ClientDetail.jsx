@@ -109,6 +109,7 @@ export default function ClientDetail() {
   const [appPasswordError, setAppPasswordError] = useState('')
   const [appPasswordDeletingId, setAppPasswordDeletingId] = useState('')
   const [appPasswordHistoryHoverId, setAppPasswordHistoryHoverId] = useState(null)
+  const [appPasswordHistoryHoverCard, setAppPasswordHistoryHoverCard] = useState(null)
 
   // Settings panel state
   const [showSettings, setShowSettings] = useState(false)
@@ -119,6 +120,7 @@ export default function ClientDetail() {
   const [handlePreview, setHandlePreview] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const settingsRef = useRef(null)
+  const appPasswordHistoryHideTimeoutRef = useRef(null)
 
   useEffect(() => {
     setShowSettings(false)
@@ -215,6 +217,7 @@ export default function ClientDetail() {
       setAppPasswordError('')
       setAppPasswordDeletingId('')
       setAppPasswordHistoryHoverId(null)
+      setAppPasswordHistoryHoverCard(null)
       return
     }
     getPlatformAppPassword(slug, socialModal.platform)
@@ -223,9 +226,18 @@ export default function ClientDetail() {
         setAppPasswordError('')
         setAppPasswordDeletingId('')
         setAppPasswordHistoryHoverId(null)
+        setAppPasswordHistoryHoverCard(null)
       })
       .catch(() => setAppPasswordData(null))
   }, [slug, socialModal])
+
+  useEffect(() => {
+    return () => {
+      if (appPasswordHistoryHideTimeoutRef.current) {
+        clearTimeout(appPasswordHistoryHideTimeoutRef.current)
+      }
+    }
+  }, [])
 
   async function handleSaveAppPassword(e) {
     e.preventDefault()
@@ -259,11 +271,55 @@ export default function ClientDetail() {
       const data = await deletePlatformAppPasswordHistory(slug, socialModal.platform, historyEntry.id)
       setAppPasswordData(data)
       setAppPasswordHistoryHoverId(null)
+      setAppPasswordHistoryHoverCard(null)
     } catch (err) {
       setAppPasswordError(err?.response?.data?.error || 'Failed to remove password version.')
     } finally {
       setAppPasswordDeletingId('')
     }
+  }
+
+  function clearAppPasswordHistoryHideTimeout() {
+    if (appPasswordHistoryHideTimeoutRef.current) {
+      clearTimeout(appPasswordHistoryHideTimeoutRef.current)
+      appPasswordHistoryHideTimeoutRef.current = null
+    }
+  }
+
+  function hideAppPasswordHistoryHover() {
+    clearAppPasswordHistoryHideTimeout()
+    setAppPasswordHistoryHoverId(null)
+    setAppPasswordHistoryHoverCard(null)
+  }
+
+  function scheduleAppPasswordHistoryHoverHide() {
+    clearAppPasswordHistoryHideTimeout()
+    appPasswordHistoryHideTimeoutRef.current = setTimeout(() => {
+      setAppPasswordHistoryHoverId(null)
+      setAppPasswordHistoryHoverCard(null)
+    }, 120)
+  }
+
+  function showAppPasswordHistoryHover(historyEntry, target) {
+    clearAppPasswordHistoryHideTimeout()
+    const rect = target.getBoundingClientRect()
+    const cardWidth = Math.min(280, window.innerWidth - 32)
+    const estimatedCardHeight = 168
+    const left = Math.min(
+      Math.max(16, rect.right - cardWidth),
+      window.innerWidth - cardWidth - 16,
+    )
+    const top = rect.bottom + estimatedCardHeight + 12 <= window.innerHeight
+      ? rect.bottom + 8
+      : Math.max(16, rect.top - estimatedCardHeight - 8)
+
+    setAppPasswordHistoryHoverId(historyEntry.id)
+    setAppPasswordHistoryHoverCard({
+      entry: historyEntry,
+      left,
+      top,
+      width: cardWidth,
+    })
   }
 
   // Debounced preview for edit-handle modal
@@ -872,21 +928,20 @@ export default function ClientDetail() {
                   </div>
                   <ul className="space-y-1 max-h-48 overflow-y-auto pr-1">
                     {previousAppPasswordHistory.map(h => {
-                      const isHovered = appPasswordHistoryHoverId === h.id
                       const isDeleting = appPasswordDeletingId === h.id
                       return (
                         <li
                           key={h.id}
                           tabIndex={0}
-                          onMouseEnter={() => setAppPasswordHistoryHoverId(h.id)}
-                          onMouseLeave={() => setAppPasswordHistoryHoverId(current => current === h.id ? null : current)}
-                          onFocus={() => setAppPasswordHistoryHoverId(h.id)}
+                          onMouseEnter={e => showAppPasswordHistoryHover(h, e.currentTarget)}
+                          onMouseLeave={scheduleAppPasswordHistoryHoverHide}
+                          onFocus={e => showAppPasswordHistoryHover(h, e.currentTarget)}
                           onBlur={(e) => {
                             if (!e.currentTarget.contains(e.relatedTarget)) {
-                              setAppPasswordHistoryHoverId(current => current === h.id ? null : current)
+                              scheduleAppPasswordHistoryHoverHide()
                             }
                           }}
-                          className={`relative text-[11px] px-2 py-1.5 rounded border border-transparent outline-none ${theme.code} ${theme.body}`}
+                          className={`text-[11px] px-2 py-1.5 rounded border border-transparent outline-none ${theme.code} ${theme.body}`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="truncate">
@@ -896,30 +951,39 @@ export default function ClientDetail() {
                               {new Date(h.changedAt).toLocaleString()}
                             </span>
                           </div>
-                          {isHovered && (
-                            <div className={`absolute left-2 right-2 top-full z-20 mt-1 rounded-md border px-2 py-2 shadow-lg ${theme.code} ${theme.cardDivider}`}>
-                              <p className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.muted}`}>
-                                Saved Value
-                              </p>
-                              <div className={`font-mono text-[11px] break-all ${theme.codeText || theme.body}`}>
-                                {h.password || <span className={theme.muted}>Empty password</span>}
-                              </div>
-                              <div className="mt-2 flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteAppPasswordHistory(h)}
-                                  disabled={!!appPasswordDeletingId}
-                                  className={`text-[10px] px-2 py-1 rounded border font-semibold transition-colors ${theme.btnCancel}`}
-                                >
-                                  {isDeleting ? 'Removing…' : 'Remove version'}
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </li>
                       )
                     })}
                   </ul>
+                  {appPasswordHistoryHoverCard && (
+                    <div
+                      className={`fixed z-[70] rounded-xl border p-3 shadow-xl ${theme.card}`}
+                      style={{
+                        top: `${appPasswordHistoryHoverCard.top}px`,
+                        left: `${appPasswordHistoryHoverCard.left}px`,
+                        width: `${appPasswordHistoryHoverCard.width}px`,
+                      }}
+                      onMouseEnter={clearAppPasswordHistoryHideTimeout}
+                      onMouseLeave={scheduleAppPasswordHistoryHoverHide}
+                    >
+                      <p className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.subtext}`}>
+                        Saved Value
+                      </p>
+                      <div className={`font-mono text-[11px] break-all ${theme.codeText || theme.body}`}>
+                        {appPasswordHistoryHoverCard.entry.password || <span className={theme.muted}>Empty password</span>}
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAppPasswordHistory(appPasswordHistoryHoverCard.entry)}
+                          disabled={!!appPasswordDeletingId}
+                          className={`text-[10px] px-2 py-1 rounded border font-semibold transition-colors ${theme.btnCancel}`}
+                        >
+                          {appPasswordDeletingId === appPasswordHistoryHoverCard.entry.id ? 'Removing…' : 'Remove version'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
