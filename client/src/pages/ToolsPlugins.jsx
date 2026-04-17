@@ -327,11 +327,15 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
           <div className="mt-2">
             <div className="h-1.5 w-full rounded-full bg-black/10 overflow-hidden">
               <div
-                className="h-full bg-emerald-500 transition-all"
+                className={`h-full bg-emerald-500 transition-all ${progress >= 100 ? 'animate-pulse' : ''}`}
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className={`text-[10px] mt-1 ${theme.muted}`}>Uploading… {progress}%</p>
+            <p className={`text-[10px] mt-1 ${theme.muted}`}>
+              {progress >= 100
+                ? (useBunny ? 'Transferring to Bunny CDN… this can take a minute for large files.' : 'Finalising…')
+                : `Uploading… ${progress}%`}
+            </p>
           </div>
         )}
         {uploadError && (
