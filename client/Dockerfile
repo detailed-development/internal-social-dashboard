@@ -1,5 +1,7 @@
 # Build stage
-FROM node:20-alpine AS builder
+# The Vite output is static, so build it on the native Buildx host platform
+# instead of running npm under QEMU for each target platform.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
