@@ -5,7 +5,7 @@
 
 import crypto from 'crypto'
 
-const DEFAULT_PREFIX = 'downloadable/internal-social-dashboard/tools-plugins'
+const DEFAULT_PREFIX = 'internal-social-dashboard/tools-plugins'
 const DEFAULT_TOKEN_TTL = 3600
 
 function env(name, fallback = '') {
