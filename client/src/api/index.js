@@ -42,15 +42,62 @@ export const createReportStyle = (data) => api.post('/report-styles', data).then
 export const updateReportStyle = (id, data) => api.patch(`/report-styles/${id}`, data).then(r => r.data)
 export const deleteReportStyle = (id) => api.delete(`/report-styles/${id}`)
 
+function buildPluginPayload(data) {
+  if (!data?.file) return data
+
+  const form = new FormData()
+  form.append('title', data.title || '')
+  form.append('category', data.category || 'General')
+  form.append('description', data.description || '')
+  form.append('version', data.version || '')
+  form.append('content', data.content || '')
+  form.append('fileName', data.fileName || '')
+  form.append('fileType', data.fileType || '')
+  form.append('file', data.file)
+
+  return form
+}
+
+function uploadProgressHandler(onProgress) {
+  return e => {
+    if (!onProgress || !e.total) return
+    onProgress(Math.round((e.loaded / e.total) * 100))
+  }
+}
+
 // Plugins / Tools
 export const getPlugins = () => api.get('/plugins').then(r => r.data)
-export const createPlugin = (data) => api.post('/plugins', data).then(r => r.data)
-export const updatePlugin = (id, data) => api.patch(`/plugins/${id}`, data).then(r => r.data)
+export const createPlugin = (data) => api.post('/plugins', buildPluginPayload(data)).then(r => r.data)
+export const updatePlugin = (id, data) => api.patch(`/plugins/${id}`, buildPluginPayload(data)).then(r => r.data)
 export const deletePlugin = (id) => api.delete(`/plugins/${id}`)
+export const getBunnyStatus = () => api.get('/plugins/bunny-status').then(r => r.data)
+export const uploadPluginToBunny = (data, onProgress) => {
+  const form = new FormData()
+  form.append('title', data.title || '')
+  form.append('category', data.category || 'General')
+  form.append('description', data.description || '')
+  form.append('version', data.version || '')
+  form.append('file', data.file)
+  return api.post('/plugins/bunny', form, {
+    onUploadProgress: uploadProgressHandler(onProgress),
+  }).then(r => r.data)
+}
+export const uploadPluginVersionToBunny = (id, data, onProgress) => {
+  const form = new FormData()
+  form.append('version', data.version || '')
+  form.append('file', data.file)
+  return api.post(`/plugins/${id}/versions/bunny`, form, {
+    onUploadProgress: uploadProgressHandler(onProgress),
+  }).then(r => r.data)
+}
+export const deletePluginVersion = (id, versionId) =>
+  api.delete(`/plugins/${id}/versions/${versionId}`).then(r => r.data)
 
 // Platform App Passwords
-export const getPlatformAppPassword = (platform) => api.get(`/platform-app-passwords/${platform}`).then(r => r.data)
-export const updatePlatformAppPassword = (platform, data) => api.put(`/platform-app-passwords/${platform}`, data).then(r => r.data)
+export const getPlatformAppPassword = (slug, platform) => api.get(`/platform-app-passwords/${slug}/${platform}`).then(r => r.data)
+export const updatePlatformAppPassword = (slug, platform, data) => api.put(`/platform-app-passwords/${slug}/${platform}`, data).then(r => r.data)
+export const deletePlatformAppPasswordHistory = (slug, platform, historyId) =>
+  api.delete(`/platform-app-passwords/${slug}/${platform}/history/${historyId}`).then(r => r.data)
 
 // AI features
 export const generateWeeklyInsights = (params) => api.post('/ai/weekly-insights', params).then(r => r.data)
