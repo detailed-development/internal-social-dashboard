@@ -7,6 +7,64 @@ import { Badge } from './badge'
 import { Button } from './button'
 import { Card, CardContent, CardHeader, CardTitle } from './card'
 
+function getOrbitPalette(themeKey) {
+  if (themeKey === 'dark') {
+    return {
+      focusText: 'text-emerald-400',
+      shellText: 'text-neutral-400',
+      panelBorder: 'border-emerald-500/20',
+      panelBackground: 'bg-[#020614]',
+      panelGlow: 'bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.22),transparent_34%),radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_64%)]',
+      ringBorder: 'border-emerald-400/14',
+      coreGradient: 'from-emerald-300 via-emerald-400 to-lime-300',
+      coreShadow: 'shadow-[0_0_60px_rgba(52,211,153,0.38)]',
+      detailsCard: 'border-emerald-400/20 bg-black/88 text-white shadow-2xl shadow-emerald-950/40 backdrop-blur-xl',
+      energyWrap: 'border-emerald-400/10 bg-emerald-500/[0.05]',
+      energyText: 'text-emerald-100/80',
+      energyTrack: 'bg-emerald-400/10',
+      energyBar: 'from-emerald-300 via-emerald-400 to-lime-300',
+      relatedWrap: 'border-emerald-400/10 bg-emerald-500/[0.05]',
+      relatedText: 'text-emerald-200/65',
+      relatedButton: 'rounded-full border-emerald-400/20 px-2.5 text-[11px] text-emerald-100 hover:border-emerald-300/40 hover:bg-emerald-400/10 hover:text-white',
+      nodeGlow: 'bg-[radial-gradient(circle,rgba(110,231,183,0.26)_0%,rgba(255,255,255,0)_70%)]',
+      nodeExpanded: 'scale-[1.45] border-emerald-200 bg-emerald-300 text-black shadow-[0_0_24px_rgba(52,211,153,0.3)]',
+      nodeRelated: 'border-emerald-300 bg-emerald-400/15 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.32)]',
+      nodeIdle: 'border-emerald-400/35 bg-black/70 text-emerald-50 hover:border-emerald-300/70 hover:bg-emerald-500/10',
+      nodeLabelIdle: 'text-emerald-100/70',
+      statusCompleted: 'bg-emerald-300 text-black border-emerald-200',
+      statusInProgress: 'bg-emerald-400/15 text-emerald-200 border-emerald-300/40',
+      statusPending: 'bg-emerald-500/5 text-emerald-100/65 border-emerald-400/15',
+    }
+  }
+
+  return {
+    focusText: 'text-violet-500',
+    shellText: 'text-gray-500',
+    panelBorder: 'border-white/10',
+    panelBackground: 'bg-[#050816]',
+    panelGlow: 'bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),transparent_34%),radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_64%)]',
+    ringBorder: 'border-white/10',
+    coreGradient: 'from-violet-500 via-sky-500 to-cyan-400',
+    coreShadow: 'shadow-[0_0_60px_rgba(56,189,248,0.35)]',
+    detailsCard: 'border-white/15 bg-black/85 text-white shadow-2xl shadow-black/30 backdrop-blur-xl',
+    energyWrap: 'border-white/10 bg-white/[0.03]',
+    energyText: 'text-white/65',
+    energyTrack: 'bg-white/10',
+    energyBar: 'from-sky-400 via-violet-400 to-fuchsia-400',
+    relatedWrap: 'border-white/10 bg-white/[0.03]',
+    relatedText: 'text-white/50',
+    relatedButton: 'rounded-full border-white/15 px-2.5 text-[11px]',
+    nodeGlow: 'bg-[radial-gradient(circle,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0)_70%)]',
+    nodeExpanded: 'scale-[1.45] border-white bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.25)]',
+    nodeRelated: 'border-sky-200 bg-sky-100/25 text-white shadow-[0_0_18px_rgba(56,189,248,0.28)]',
+    nodeIdle: 'border-white/35 bg-black/70 text-white hover:border-white/70 hover:bg-black/80',
+    nodeLabelIdle: 'text-white/65',
+    statusCompleted: 'bg-white text-black border-white',
+    statusInProgress: 'bg-sky-400/15 text-sky-200 border-sky-300/40',
+    statusPending: 'bg-white/5 text-white/65 border-white/15',
+  }
+}
+
 function clampEnergy(energy) {
   return Math.max(8, Math.min(100, Math.round(energy || 0)))
 }
@@ -17,18 +75,18 @@ function getStatusLabel(status) {
   return 'Pending'
 }
 
-function getStatusStyles(status) {
-  if (status === 'completed') return 'bg-white text-black border-white'
-  if (status === 'in-progress') return 'bg-sky-400/15 text-sky-200 border-sky-300/40'
-  return 'bg-white/5 text-white/65 border-white/15'
+function getStatusStyles(status, palette) {
+  if (status === 'completed') return palette.statusCompleted
+  if (status === 'in-progress') return palette.statusInProgress
+  return palette.statusPending
 }
 
-function DetailsCard({ item, timelineData, onSelect, className }) {
+function DetailsCard({ item, timelineData, onSelect, className, palette }) {
   return (
-    <Card className={cn('w-64 border-white/15 bg-black/85 text-white shadow-2xl shadow-black/30 backdrop-blur-xl', className)}>
+    <Card className={cn('w-64', palette.detailsCard, className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3">
-          <Badge className={cn('text-[10px]', getStatusStyles(item.status))}>
+          <Badge className={cn('text-[10px]', getStatusStyles(item.status, palette))}>
             {getStatusLabel(item.status)}
           </Badge>
           <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/45">
@@ -41,25 +99,25 @@ function DetailsCard({ item, timelineData, onSelect, className }) {
       <CardContent className="space-y-4 text-xs text-white/75">
         <p className="leading-relaxed">{item.content}</p>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-          <div className="mb-2 flex items-center justify-between text-[11px] text-white/65">
+        <div className={cn('rounded-2xl border p-3', palette.energyWrap)}>
+          <div className={cn('mb-2 flex items-center justify-between text-[11px]', palette.energyText)}>
             <span className="inline-flex items-center gap-1">
               <Zap size={12} />
               Energy
             </span>
             <span className="font-mono">{clampEnergy(item.energy)}%</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className={cn('h-1.5 overflow-hidden rounded-full', palette.energyTrack)}>
             <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 via-violet-400 to-fuchsia-400"
+              className={cn('h-full rounded-full bg-gradient-to-r', palette.energyBar)}
               style={{ width: `${clampEnergy(item.energy)}%` }}
             />
           </div>
         </div>
 
         {item.relatedIds?.length > 0 && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-            <div className="mb-2 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.12em] text-white/50">
+          <div className={cn('rounded-2xl border p-3', palette.relatedWrap)}>
+            <div className={cn('mb-2 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.12em]', palette.relatedText)}>
               <Link2 size={12} />
               Connected Nodes
             </div>
@@ -73,7 +131,7 @@ function DetailsCard({ item, timelineData, onSelect, className }) {
                     key={relatedId}
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-white/15 px-2.5 text-[11px]"
+                    className={palette.relatedButton}
                     onClick={e => {
                       e.stopPropagation()
                       onSelect(relatedId)
@@ -97,7 +155,7 @@ export default function RadialOrbitalTimeline({
   title = 'Dashboard orbit',
   description = 'Interactive map of the active workflow across the dashboard.',
 }) {
-  const { theme } = useTheme()
+  const { theme, themeKey } = useTheme()
   const [expandedId, setExpandedId] = useState(null)
   const [rotationAngle, setRotationAngle] = useState(0)
   const [autoRotate, setAutoRotate] = useState(true)
@@ -126,6 +184,7 @@ export default function RadialOrbitalTimeline({
 
   const compact = viewportWidth < 768
   const radius = compact ? 120 : viewportWidth < 1100 ? 170 : 192
+  const palette = useMemo(() => getOrbitPalette(themeKey), [themeKey])
 
   const activeItem = useMemo(
     () => timelineData.find(item => item.id === expandedId) || null,
@@ -183,8 +242,8 @@ export default function RadialOrbitalTimeline({
           <p className={`mt-1 max-w-2xl text-sm ${theme.subtext}`}>{description}</p>
         </div>
 
-        <div className="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-black/5 px-3 py-1.5 text-[11px] font-medium text-gray-500">
-          <span className={autoRotate ? 'text-emerald-500' : 'text-violet-500'}>
+        <div className={cn('inline-flex items-center gap-2 self-start rounded-full border bg-black/5 px-3 py-1.5 text-[11px] font-medium border-white/10', palette.shellText)}>
+          <span className={autoRotate ? 'text-emerald-500' : palette.focusText}>
             {autoRotate ? 'Auto-rotating' : 'Focused'}
           </span>
           <span className="text-gray-300">•</span>
@@ -199,18 +258,18 @@ export default function RadialOrbitalTimeline({
       </div>
 
       <div
-        className="relative mt-5 overflow-hidden rounded-[28px] border border-white/10 bg-[#050816]"
+        className={cn('relative mt-5 overflow-hidden rounded-[28px] border', palette.panelBorder, palette.panelBackground)}
         onClick={clearSelection}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),transparent_34%),radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_64%)]" />
+        <div className={cn('absolute inset-0', palette.panelGlow)} />
         <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:34px_34px]" />
 
         <div className="relative min-h-[26rem] sm:min-h-[32rem]">
           <div className="absolute left-1/2 top-1/2 h-0 w-0">
-            <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
-            <div className="absolute left-1/2 top-1/2 h-[17rem] w-[17rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 sm:h-[23rem] sm:w-[23rem]" />
+            <div className={cn('absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border', palette.ringBorder)} />
+            <div className={cn('absolute left-1/2 top-1/2 h-[17rem] w-[17rem] -translate-x-1/2 -translate-y-1/2 rounded-full border sm:h-[23rem] sm:w-[23rem]', palette.ringBorder)} />
 
-            <div className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-sky-500 to-cyan-400 shadow-[0_0_60px_rgba(56,189,248,0.35)]">
+            <div className={cn('absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br', palette.coreGradient, palette.coreShadow)}>
               <div className="absolute inset-0 rounded-full animate-ping border border-white/15" />
               <div className="h-8 w-8 rounded-full bg-white/85 backdrop-blur-md" />
             </div>
@@ -240,7 +299,8 @@ export default function RadialOrbitalTimeline({
                 >
                   <div
                     className={cn(
-                      'pointer-events-none absolute rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0)_70%)] transition-all duration-500',
+                      'pointer-events-none absolute rounded-full transition-all duration-500',
+                      palette.nodeGlow,
                       isExpanded || isRelated ? 'animate-pulse' : '',
                     )}
                     style={{
@@ -254,16 +314,16 @@ export default function RadialOrbitalTimeline({
                     className={cn(
                       'relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300',
                       isExpanded
-                        ? 'scale-[1.45] border-white bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.25)]'
+                        ? palette.nodeExpanded
                         : isRelated
-                          ? 'border-sky-200 bg-sky-100/25 text-white shadow-[0_0_18px_rgba(56,189,248,0.28)]'
-                          : 'border-white/35 bg-black/70 text-white hover:border-white/70 hover:bg-black/80',
+                          ? palette.nodeRelated
+                          : palette.nodeIdle,
                     )}
                   >
                     <Icon size={16} />
                   </button>
 
-                  <div className={cn('mt-3 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.18em] transition-all duration-300', isExpanded ? 'scale-110 text-white' : 'text-white/65')}>
+                  <div className={cn('mt-3 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.18em] transition-all duration-300', isExpanded ? 'scale-110 text-white' : palette.nodeLabelIdle)}>
                     {item.title}
                   </div>
 
@@ -272,6 +332,7 @@ export default function RadialOrbitalTimeline({
                       item={item}
                       timelineData={timelineData}
                       onSelect={toggleItem}
+                      palette={palette}
                       className="absolute left-1/2 top-16 -translate-x-1/2"
                     />
                   )}
@@ -287,6 +348,7 @@ export default function RadialOrbitalTimeline({
           item={activeItem}
           timelineData={timelineData}
           onSelect={toggleItem}
+          palette={palette}
           className="mt-4 border-white/10"
         />
       )}
