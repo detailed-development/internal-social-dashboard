@@ -91,9 +91,9 @@ export async function buildSocialOverviewFromReadModel(prisma, { clientId, windo
     .map((g) => ({
       type: g.mediaType,
       platform: g.platform,
-      count: g._count._all,
-      avgEngagement: Math.round(g._avg.engagement ?? 0),
-      totalEngagement: g._sum.engagement ?? 0,
+      count: g._count?._all ?? 0,
+      avgEngagement: Math.round(g._avg?.engagement ?? 0),
+      totalEngagement: g._sum?.engagement ?? 0,
     }))
     .sort((a, b) => b.count - a.count);
 

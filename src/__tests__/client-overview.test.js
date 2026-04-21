@@ -152,13 +152,30 @@ function buildFixturePrisma() {
         return Promise.resolve(take ? arr.slice(0, take) : arr);
       }),
       groupBy: vi.fn(({ where }) => {
-        const counts = {};
+        const groups = new Map();
         for (const r of postPerf) {
           if (r.clientId !== where.clientId) continue;
           if (r.date < where.date.gte || r.date > where.date.lte) continue;
-          counts[r.mediaType] = (counts[r.mediaType] || 0) + 1;
+          const key = `${r.platform}|${r.mediaType}`;
+          const existing = groups.get(key) || {
+            platform: r.platform,
+            mediaType: r.mediaType,
+            count: 0,
+            totalEngagement: 0,
+          };
+          existing.count += 1;
+          existing.totalEngagement += r.engagement;
+          groups.set(key, existing);
         }
-        return Promise.resolve(Object.entries(counts).map(([mediaType, n]) => ({ mediaType, _count: { _all: n } })));
+        return Promise.resolve(
+          [...groups.values()].map((g) => ({
+            platform: g.platform,
+            mediaType: g.mediaType,
+            _count: { _all: g.count },
+            _avg: { engagement: g.count > 0 ? g.totalEngagement / g.count : null },
+            _sum: { engagement: g.totalEngagement },
+          }))
+        );
       }),
     },
     clientWebDailyMetric: {
