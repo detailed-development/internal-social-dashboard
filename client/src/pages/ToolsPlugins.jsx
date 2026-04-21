@@ -11,11 +11,23 @@ const TEXT_FILE_EXTENSIONS = new Set([
   'js', 'jsx', 'ts', 'tsx', 'php', 'css', 'scss', 'html', 'htm',
   'json', 'md', 'txt', 'sh', 'py', 'sql', 'yml', 'yaml', 'xml',
 ])
+const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
+  'zip', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
+])
+const IMAGE_FILE_EXTENSIONS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
+])
+const SUPPORTED_UPLOAD_ACCEPT = '.zip,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,application/zip,application/pdf,image/png,image/jpeg,image/gif,image/webp,image/svg+xml'
 
 function isReadableTextFile(file) {
   if (!file) return false
   const ext = inferFileType(file.name)
   return file.type.startsWith('text/') || TEXT_FILE_EXTENSIONS.has(ext) || !file.type
+}
+
+function isSupportedUploadFile(file) {
+  if (!file) return false
+  return SUPPORTED_UPLOAD_EXTENSIONS.has(inferFileType(file.name))
 }
 
 function mimeFromExtension(ext) {
@@ -70,6 +82,30 @@ function formatVersionDate(value) {
   }
 }
 
+function assetFileType(asset) {
+  return String(asset?.fileType || inferFileType(asset?.fileName || '') || '').toLowerCase()
+}
+
+function isImageAsset(asset) {
+  return String(asset?.mimeType || '').toLowerCase().startsWith('image/') || IMAGE_FILE_EXTENSIONS.has(assetFileType(asset))
+}
+
+function isPdfAsset(asset) {
+  return String(asset?.mimeType || '').toLowerCase() === 'application/pdf' || assetFileType(asset) === 'pdf'
+}
+
+function isManagedUpload(asset) {
+  return asset?.downloadUrl?.startsWith('/_plugin_uploads/')
+}
+
+function resolvePluginFileUrl(plugin, mode = 'open') {
+  if (!plugin) return ''
+  if (isManagedUpload(plugin)) {
+    return `/api/plugins/${plugin.id}/${mode === 'download' ? 'download' : 'file'}`
+  }
+  return plugin.downloadUrl || ''
+}
+
 function NewVersionForm({ theme, onCancel, onSubmit }) {
   const [version, setVersion] = useState('')
   const [file, setFile] = useState(null)
@@ -80,8 +116,8 @@ function NewVersionForm({ theme, onCancel, onSubmit }) {
   function handleFile(e) {
     const selected = e.target.files?.[0]
     if (!selected) return
-    if (!selected.name.toLowerCase().endsWith('.zip')) {
-      setError('Only .zip files are supported.')
+    if (!isSupportedUploadFile(selected)) {
+      setError('Only ZIP, PDF, PNG, JPG, JPEG, GIF, WEBP, and SVG files are supported.')
       e.target.value = ''
       return
     }
@@ -113,7 +149,7 @@ function NewVersionForm({ theme, onCancel, onSubmit }) {
         />
         <input
           type="file"
-          accept=".zip,application/zip"
+          accept={SUPPORTED_UPLOAD_ACCEPT}
           onChange={handleFile}
           disabled={saving}
           className={`block w-full text-xs rounded border px-2 py-1 focus:outline-none ${theme.input}`}
@@ -139,7 +175,7 @@ function NewVersionForm({ theme, onCancel, onSubmit }) {
           disabled={saving || !file}
           className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-colors ${theme.btnPrimary}`}
         >
-          {saving ? '…' : 'Upload version'}
+          {saving ? '…' : 'Upload file'}
         </button>
         <button
           type="button"
@@ -170,13 +206,18 @@ function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDelete
   }
 
   const hasStoredFile = Boolean(plugin.content && plugin.fileName)
-  const isManagedZip = plugin.downloadUrl?.startsWith('/_plugin_uploads/')
-  const isBunnyZip = plugin.storageProvider === 'bunny'
+  const managedUpload = isManagedUpload(plugin)
+  const isBunnyFile = plugin.storageProvider === 'bunny'
   const ingestBadge = plugin.ingestStatus && plugin.ingestStatus !== 'ready'
     ? plugin.ingestStatus
     : null
   const versions = plugin.versions || []
-  const canAddVersion = isBunnyZip && bunnyAvailable
+  const canAddVersion = isBunnyFile && bunnyAvailable
+  const fileOpenUrl = !hasStoredFile ? resolvePluginFileUrl(plugin, 'open') : ''
+  const fileDownloadUrl = !hasStoredFile ? resolvePluginFileUrl(plugin, 'download') : ''
+  const showImagePreview = Boolean(fileOpenUrl) && isImageAsset(plugin)
+  const showOpenInline = Boolean(fileOpenUrl) && (showImagePreview || isPdfAsset(plugin))
+  const openLabel = showImagePreview ? 'Open image' : 'Open PDF'
 
   async function handleUploadVersion(data) {
     try {
@@ -194,7 +235,8 @@ function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDelete
             {plugin.category}
             {plugin.version ? ` · v${plugin.version.replace(/^v/i, '')}` : ''}
             {plugin.fileType ? ` · ${plugin.fileType}` : ''}
-            {isBunnyZip ? ' · bunny' : ''}
+            {plugin.fileSize ? ` · ${formatFileSize(plugin.fileSize)}` : ''}
+            {isBunnyFile ? ' · bunny' : managedUpload ? ' · local' : ''}
           </p>
           {ingestBadge && (
             <p className="text-[10px] mt-0.5 text-amber-500 font-semibold uppercase">
@@ -226,6 +268,22 @@ function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDelete
 
       {plugin.description && (
         <p className={`text-xs ${theme.body}`}>{plugin.description}</p>
+      )}
+
+      {showImagePreview && (
+        <a
+          href={fileOpenUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="block"
+        >
+          <img
+            src={fileOpenUrl}
+            alt={plugin.title}
+            loading="lazy"
+            className={`w-full max-h-56 object-contain rounded-lg border ${theme.card}`}
+          />
+        </a>
       )}
 
       {plugin.content && (
@@ -266,28 +324,33 @@ function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDelete
         </div>
       )}
 
-      {isManagedZip ? (
-        <a
-          href={`/api/plugins/${plugin.id}/download`}
-          className={`inline-flex items-center justify-center text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-colors ${theme.btnCancel}`}
-        >
-          ⬇ Download {plugin.fileName || 'zip'}
-        </a>
-      ) : (
-        !hasStoredFile && !isBunnyZip && plugin.downloadUrl && (
-          <a
-            href={plugin.downloadUrl}
-            download={plugin.fileName || true}
-            target="_blank"
-            rel="noreferrer"
-            className={`inline-flex items-center justify-center text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-colors ${theme.btnCancel}`}
-          >
-            ⬇ Download{plugin.fileName ? ` ${plugin.fileName}` : ''}
-          </a>
-        )
+      {!hasStoredFile && (showOpenInline || fileDownloadUrl) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {showOpenInline && (
+            <a
+              href={fileOpenUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center justify-center text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-colors ${theme.btnPrimary}`}
+            >
+              ↗ {openLabel}
+            </a>
+          )}
+          {fileDownloadUrl && (
+            <a
+              href={fileDownloadUrl}
+              download={plugin.fileName || true}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center justify-center text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-colors ${theme.btnCancel}`}
+            >
+              ⬇ Download{plugin.fileName ? ` ${plugin.fileName}` : ''}
+            </a>
+          )}
+        </div>
       )}
 
-      {isBunnyZip && versions.length > 0 && (
+      {isBunnyFile && versions.length > 0 && (
         <div className="pt-2 border-t border-current/10">
           <div className="flex items-center justify-between gap-2">
             <button
@@ -331,6 +394,17 @@ function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDelete
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {(isImageAsset(v) || isPdfAsset(v)) && v.downloadUrl && (
+                      <a
+                        href={v.downloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`text-[10px] px-2 py-0.5 rounded border font-semibold transition-colors ${theme.btnPrimary}`}
+                        title={isImageAsset(v) ? 'Open image version' : 'Open PDF version'}
+                      >
+                        ↗
+                      </a>
+                    )}
                     {v.downloadUrl && (
                       <a
                         href={v.downloadUrl}
@@ -371,7 +445,7 @@ function PluginNode({ plugin, theme, onEdit, onDelete, onUploadVersion, onDelete
         </div>
       )}
 
-      {isBunnyZip && versions.length === 0 && canAddVersion && (
+      {isBunnyFile && versions.length === 0 && canAddVersion && (
         <div className="pt-2 border-t border-current/10">
           {newVersionOpen ? (
             <NewVersionForm
@@ -415,25 +489,25 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
     setForm(f => ({ ...f, [key]: value }))
   }
 
-  function handleZipChange(e) {
+  function handleFileChange(e) {
     const selected = e.target.files?.[0]
     if (!selected) return
 
-    const ext = inferFileType(selected.name)
-    if (ext !== 'zip') {
-      setUploadError('Only .zip files are supported here.')
+    if (!isSupportedUploadFile(selected)) {
+      setUploadError('Only ZIP, PDF, PNG, JPG, JPEG, GIF, WEBP, and SVG files are supported here.')
       e.target.value = ''
       return
     }
 
+    const ext = inferFileType(selected.name)
     setFile(selected)
     setForm(f => ({
       ...f,
-      title: f.title || selected.name.replace(/\.zip$/i, ''),
+      title: f.title || selected.name.replace(/\.[^.]+$/i, ''),
       content: '',
       downloadUrl: '',
       fileName: selected.name,
-      fileType: 'zip',
+      fileType: ext,
     }))
     setUploadError('')
   }
@@ -498,7 +572,7 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
       <div className={`rounded-xl border p-3 ${theme.card}`}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <label className={`text-xs font-semibold uppercase tracking-[0.14em] ${theme.subtext}`}>
-            Upload zip
+            Upload file
           </label>
           {bunnyAvailable && !initial && (
             <label className={`inline-flex items-center gap-1.5 text-[11px] ${theme.body}`}>
@@ -513,15 +587,16 @@ function PluginForm({ initial, theme, onCancel, onSave, bunnyAvailable }) {
         </div>
         <input
           type="file"
-          accept=".zip,application/zip"
-          onChange={handleZipChange}
+          accept={SUPPORTED_UPLOAD_ACCEPT}
+          onChange={handleFileChange}
           disabled={saving}
           className={`block w-full text-sm rounded-lg border px-3 py-2 focus:outline-none ${theme.input}`}
         />
         <p className={`text-[11px] mt-2 ${theme.muted}`}>
           {useBunny && !initial
-            ? 'Uploads to Bunny CDN. Clears the content field below.'
-            : 'Uploading a zip stores the file on the server and clears the content field below.'}
+            ? 'Uploads supported files to Bunny CDN. Clears the content field below.'
+            : 'Uploading a file stores it on the server and clears the content field below.'}
+          {' '}Supported: ZIP, PDF, PNG, JPG, JPEG, GIF, WEBP, SVG.
         </p>
         {file && (
           <p className={`text-[11px] mt-2 ${theme.body}`}>
@@ -611,7 +686,7 @@ export default function ToolsPlugins() {
         <div>
           <h2 className={`text-2xl font-bold ${theme.heading}`}>Tools & Plugins</h2>
           <p className={`text-sm mt-1 ${theme.subtext}`}>
-            Upload custom scripts, plugins, and snippets. Grouped by category.
+            Upload scripts, plugins, images, PDFs, and snippets. Grouped by category.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

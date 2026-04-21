@@ -1,8 +1,9 @@
-// Thin wrapper around Bunny Storage REST API for plugin ZIP uploads.
+// Thin wrapper around Bunny Storage REST API for plugin file uploads.
 // Bunny Storage does not support S3-style signed PUT URLs, so the server
 // receives the file via multer and streams it onward — the browser never
 // sees the AccessKey.
 
+import axios from 'axios'
 import crypto from 'crypto'
 
 const DEFAULT_PREFIX = 'internal-social-dashboard/tools-plugins'
@@ -33,13 +34,13 @@ export function getPublicUrl(storageKey) {
 }
 
 function slugifyFilename(name) {
-  const base = (name || 'file.zip').replace(/\\/g, '/').split('/').pop()
+  const base = (name || 'file.bin').replace(/\\/g, '/').split('/').pop()
   return base
     .normalize('NFKD')
     .replace(/[^\w.\-]+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 120) || 'file.zip'
+    .slice(0, 120) || 'file.bin'
 }
 
 function slugifyTitle(title) {
@@ -66,17 +67,26 @@ export function buildPluginStorageKey(pluginId, fileName, title) {
   return `${prefix}/${folder}/${Date.now()}-${safe}`
 }
 
-export async function uploadObject(storageKey, body, { contentType = 'application/zip' } = {}) {
-  const res = await fetch(storageUrl(storageKey), {
-    method: 'PUT',
-    headers: {
-      AccessKey: env('BUNNY_STORAGE_API_KEY'),
-      'Content-Type': contentType,
-    },
-    body,
+export async function uploadObject(storageKey, body, { contentType = 'application/octet-stream', contentLength } = {}) {
+  const headers = {
+    AccessKey: env('BUNNY_STORAGE_API_KEY'),
+    'Content-Type': contentType,
+  }
+  if (Number.isFinite(contentLength) && contentLength >= 0) {
+    headers['Content-Length'] = String(contentLength)
+  }
+
+  const res = await axios.put(storageUrl(storageKey), body, {
+    headers,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0,
+    responseType: 'text',
+    transformResponse: [(data) => data],
+    validateStatus: () => true,
   })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
+  if (res.status < 200 || res.status >= 300) {
+    const text = typeof res.data === 'string' ? res.data : ''
     throw new Error(`Bunny upload failed (${res.status}): ${text || res.statusText}`)
   }
   return { ok: true }

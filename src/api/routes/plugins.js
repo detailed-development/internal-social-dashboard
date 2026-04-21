@@ -17,12 +17,50 @@ const router = Router()
 const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads', 'plugins')
 const LOCAL_FILE_PREFIX = '/_plugin_uploads/'
 const MAX_UPLOAD_BYTES = Number(process.env.PLUGIN_MAX_UPLOAD_BYTES) || 325 * 1024 * 1024
+const IMAGE_MIME_BY_EXT = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+}
+const MIME_BY_EXT = {
+  zip: 'application/zip',
+  pdf: 'application/pdf',
+  ...IMAGE_MIME_BY_EXT,
+}
+const ALLOWED_UPLOAD_EXTENSIONS = new Set(Object.keys(MIME_BY_EXT))
+const ALLOWED_UPLOAD_LABEL = 'ZIP, PDF, PNG, JPG, JPEG, GIF, WEBP, and SVG'
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
-function zipFileFilter(req, file, cb) {
-  const ext = path.extname(file.originalname).toLowerCase()
-  if (ext !== '.zip') return cb(new Error('Only .zip files are allowed'))
+function inferFileType(name = '') {
+  const ext = path.extname(name).toLowerCase().replace(/^\./, '')
+  return ext || null
+}
+
+function normalizeMimeType(file) {
+  const ext = inferFileType(file?.originalname)
+  const preferred = ext ? MIME_BY_EXT[ext] : null
+  const provided = String(file?.mimetype || '').trim().toLowerCase()
+  return preferred || provided || 'application/octet-stream'
+}
+
+function buildStoredFileFields(file) {
+  return {
+    fileName: file.originalname,
+    fileType: inferFileType(file.originalname),
+    fileSize: file.size,
+    mimeType: normalizeMimeType(file),
+  }
+}
+
+function uploadFileFilter(req, file, cb) {
+  const ext = inferFileType(file.originalname)
+  if (!ext || !ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
+    return cb(new Error(`Only ${ALLOWED_UPLOAD_LABEL} files are allowed.`))
+  }
   cb(null, true)
 }
 
@@ -39,15 +77,15 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: MAX_UPLOAD_BYTES },
-  fileFilter: zipFileFilter,
+  fileFilter: uploadFileFilter,
 })
 
-// In-memory multer for the Bunny upload path — the buffer is streamed to
-// Bunny Storage and discarded; no file ever touches the server disk.
+// Bunny uploads share the same temp-file storage so large files do not have to
+// be buffered fully in Node memory before they are relayed to Bunny.
 const bunnyUpload = multer({
-  storage: multer.memoryStorage(),
+  storage,
   limits: { fileSize: MAX_UPLOAD_BYTES },
-  fileFilter: zipFileFilter,
+  fileFilter: uploadFileFilter,
 })
 
 function getManagedUploadPath(downloadUrl) {
@@ -62,6 +100,21 @@ function unlinkIfExists(filePath) {
   } catch {
     // ignore cleanup errors
   }
+}
+
+function cleanupTempUpload(file) {
+  if (file?.path) unlinkIfExists(file.path)
+}
+
+function maxUploadLabel(bytes) {
+  const mb = bytes / (1024 * 1024)
+  const rounded = Number.isInteger(mb) ? String(mb) : mb.toFixed(1).replace(/\.0$/, '')
+  return `${rounded} MB`
+}
+
+function buildDispositionHeader(disposition, fileName) {
+  const safeName = String(fileName || 'file').replace(/"/g, '')
+  return `${disposition}; filename="${safeName}"`
 }
 
 // Sign Bunny-hosted download URLs at read time so stored rows stay clean and
@@ -92,8 +145,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-// GET /api/plugins/:id/download → download stored local zip
-router.get('/:id/download', async (req, res) => {
+async function serveManagedUpload(req, res, { inline = false } = {}) {
   const prisma = req.app.get('prisma')
 
   try {
@@ -110,10 +162,28 @@ router.get('/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Uploaded file not found' })
     }
 
-    return res.download(filePath, plugin.fileName || path.basename(filePath))
+    const downloadName = plugin.fileName || path.basename(filePath)
+    if (!inline) {
+      return res.download(filePath, downloadName)
+    }
+
+    res.type(plugin.mimeType || downloadName)
+    res.setHeader('Content-Disposition', buildDispositionHeader('inline', downloadName))
+    return res.sendFile(filePath)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+}
+
+// GET /api/plugins/:id/file → open stored local file inline when the browser
+// supports it (images/PDFs), otherwise it still downloads normally.
+router.get('/:id/file', async (req, res) => {
+  return serveManagedUpload(req, res, { inline: true })
+})
+
+// GET /api/plugins/:id/download → force download for a locally managed file.
+router.get('/:id/download', async (req, res) => {
+  return serveManagedUpload(req, res, { inline: false })
 })
 
 // GET /api/plugins/bunny-status → whether Bunny storage is configured, so the
@@ -122,9 +192,8 @@ router.get('/bunny-status', (req, res) => {
   res.json({ configured: isBunnyConfigured(), maxBytes: MAX_UPLOAD_BYTES })
 })
 
-// POST /api/plugins/bunny → multipart upload that streams the ZIP to Bunny
-// Storage and persists storage metadata on a new plugin row. The file never
-// hits server disk; the buffer is released as soon as Bunny ACKs the PUT.
+// POST /api/plugins/bunny → multipart upload that relays the file from a temp
+// file to Bunny Storage, then persists storage metadata on a new plugin row.
 // Also creates the plugin's first PluginVersion history row.
 router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
   const prisma = req.app.get('prisma')
@@ -141,7 +210,10 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
   }
 
   let plugin
+  let storageKey = null
+  let uploadedToBunny = false
   try {
+    const fileFields = buildStoredFileFields(req.file)
     // Reserve the row first so we can use its id in the storage key.
     plugin = await prisma.plugin.create({
       data: {
@@ -149,17 +221,22 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
         category: category || 'General',
         description: description || null,
         version: version || null,
-        fileName: req.file.originalname,
-        fileType: 'zip',
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype || 'application/zip',
+        ...fileFields,
         storageProvider: 'bunny',
         ingestStatus: 'uploading',
       },
     })
 
-    const storageKey = buildPluginStorageKey(plugin.id, req.file.originalname, title)
-    await uploadObject(storageKey, req.file.buffer, { contentType: 'application/zip' })
+    storageKey = buildPluginStorageKey(plugin.id, req.file.originalname, title)
+    await uploadObject(
+      storageKey,
+      fs.createReadStream(req.file.path),
+      {
+        contentType: fileFields.mimeType,
+        contentLength: req.file.size,
+      },
+    )
+    uploadedToBunny = true
 
     const downloadUrl = getPublicUrl(storageKey)
     const uploadedAt = new Date()
@@ -175,10 +252,7 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
         versions: {
           create: {
             version: version || null,
-            fileName: req.file.originalname,
-            fileType: 'zip',
-            fileSize: req.file.size,
-            mimeType: req.file.mimetype || 'application/zip',
+            ...fileFields,
             storageProvider: 'bunny',
             storageKey,
             downloadUrl,
@@ -193,6 +267,11 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
     res.status(201).json(withSignedDownloadUrl(plugin))
   } catch (err) {
     console.error('[plugins/bunny] upload failed:', err)
+    if (uploadedToBunny && storageKey) {
+      await deleteObject(storageKey).catch(cleanupErr => {
+        console.error('[plugins/bunny] cleanup failed:', cleanupErr.message)
+      })
+    }
     if (plugin?.id) {
       await prisma.plugin.update({
         where: { id: plugin.id },
@@ -200,6 +279,8 @@ router.post('/bunny', bunnyUpload.single('file'), async (req, res) => {
       }).catch(() => {})
     }
     res.status(500).json({ error: err.message || 'Bunny upload failed' })
+  } finally {
+    cleanupTempUpload(req.file)
   }
 })
 
@@ -222,47 +303,62 @@ router.post('/:id/versions/bunny', bunnyUpload.single('file'), async (req, res) 
     if (!existing) return res.status(404).json({ error: 'Plugin not found' })
 
     const storageKey = buildPluginStorageKey(existing.id, req.file.originalname, existing.title)
-    await uploadObject(storageKey, req.file.buffer, { contentType: 'application/zip' })
-
-    const downloadUrl = getPublicUrl(storageKey)
-    const uploadedAt = new Date()
-
-    const updated = await prisma.plugin.update({
-      where: { id: existing.id },
-      data: {
-        version: version || null,
-        fileName: req.file.originalname,
-        fileType: 'zip',
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype || 'application/zip',
-        storageProvider: 'bunny',
+    let uploadedToBunny = false
+    try {
+      const fileFields = buildStoredFileFields(req.file)
+      await uploadObject(
         storageKey,
-        downloadUrl,
-        ingestStatus: 'ready',
-        ingestError: null,
-        uploadedAt,
-        versions: {
-          create: {
-            version: version || null,
-            fileName: req.file.originalname,
-            fileType: 'zip',
-            fileSize: req.file.size,
-            mimeType: req.file.mimetype || 'application/zip',
-            storageProvider: 'bunny',
-            storageKey,
-            downloadUrl,
-            ingestStatus: 'ready',
-            uploadedAt,
+        fs.createReadStream(req.file.path),
+        {
+          contentType: fileFields.mimeType,
+          contentLength: req.file.size,
+        },
+      )
+      uploadedToBunny = true
+
+      const downloadUrl = getPublicUrl(storageKey)
+      const uploadedAt = new Date()
+
+      const updated = await prisma.plugin.update({
+        where: { id: existing.id },
+        data: {
+          version: version || null,
+          ...fileFields,
+          storageProvider: 'bunny',
+          storageKey,
+          downloadUrl,
+          ingestStatus: 'ready',
+          ingestError: null,
+          uploadedAt,
+          versions: {
+            create: {
+              version: version || null,
+              ...fileFields,
+              storageProvider: 'bunny',
+              storageKey,
+              downloadUrl,
+              ingestStatus: 'ready',
+              uploadedAt,
+            },
           },
         },
-      },
-      include: { versions: { orderBy: { createdAt: 'desc' } } },
-    })
+        include: { versions: { orderBy: { createdAt: 'desc' } } },
+      })
 
-    res.status(201).json(withSignedDownloadUrl(updated))
+      res.status(201).json(withSignedDownloadUrl(updated))
+    } catch (err) {
+      if (uploadedToBunny && storageKey) {
+        await deleteObject(storageKey).catch(cleanupErr => {
+          console.error('[plugins/:id/versions/bunny] cleanup failed:', cleanupErr.message)
+        })
+      }
+      throw err
+    }
   } catch (err) {
     console.error('[plugins/:id/versions/bunny] upload failed:', err)
     res.status(500).json({ error: err.message || 'Bunny upload failed' })
+  } finally {
+    cleanupTempUpload(req.file)
   }
 })
 
@@ -345,7 +441,7 @@ router.delete('/:id/versions/:versionId', async (req, res) => {
   }
 })
 
-// POST /api/plugins → create a plugin or upload a zip
+// POST /api/plugins → create a plugin or upload a supported file
 router.post('/', upload.single('file'), async (req, res) => {
   const prisma = req.app.get('prisma')
   const { title, category, description, content, downloadUrl, fileName, fileType, version } = req.body
@@ -356,6 +452,7 @@ router.post('/', upload.single('file'), async (req, res) => {
   }
 
   try {
+    const fileFields = req.file ? buildStoredFileFields(req.file) : null
     const plugin = await prisma.plugin.create({
       data: {
         title,
@@ -366,12 +463,11 @@ router.post('/', upload.single('file'), async (req, res) => {
         downloadUrl: req.file
           ? `${LOCAL_FILE_PREFIX}${req.file.filename}`
           : (downloadUrl || null),
-        fileName: req.file
-          ? req.file.originalname
-          : (fileName || null),
-        fileType: req.file
-          ? 'zip'
-          : (fileType || null),
+        fileName: req.file ? fileFields.fileName : (fileName || null),
+        fileType: req.file ? fileFields.fileType : (fileType || null),
+        fileSize: req.file ? fileFields.fileSize : null,
+        mimeType: req.file ? fileFields.mimeType : null,
+        uploadedAt: req.file ? new Date() : null,
       },
     })
 
@@ -382,7 +478,7 @@ router.post('/', upload.single('file'), async (req, res) => {
   }
 })
 
-// PATCH /api/plugins/:id → update fields, optionally replace zip
+// PATCH /api/plugins/:id → update fields, optionally replace the uploaded file
 router.patch('/:id', upload.single('file'), async (req, res) => {
   const prisma = req.app.get('prisma')
   const { title, category, description, content, downloadUrl, fileName, fileType, version } = req.body
@@ -398,6 +494,7 @@ router.patch('/:id', upload.single('file'), async (req, res) => {
     }
 
     const oldManagedPath = getManagedUploadPath(existing.downloadUrl)
+    const fileFields = req.file ? buildStoredFileFields(req.file) : null
 
     const plugin = await prisma.plugin.update({
       where: { id: req.params.id },
@@ -410,8 +507,13 @@ router.patch('/:id', upload.single('file'), async (req, res) => {
           ? {
               content: null,
               downloadUrl: `${LOCAL_FILE_PREFIX}${req.file.filename}`,
-              fileName: req.file.originalname,
-              fileType: 'zip',
+              fileName: fileFields.fileName,
+              fileType: fileFields.fileType,
+              fileSize: fileFields.fileSize,
+              mimeType: fileFields.mimeType,
+              storageProvider: null,
+              storageKey: null,
+              uploadedAt: new Date(),
             }
           : {
               ...(content !== undefined && { content }),
@@ -479,12 +581,12 @@ router.delete('/:id', async (req, res) => {
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'Zip file is too large (max 25 MB).' })
+      return res.status(400).json({ error: `File is too large (max ${maxUploadLabel(MAX_UPLOAD_BYTES)}).` })
     }
     return res.status(400).json({ error: err.message })
   }
 
-  if (err?.message === 'Only .zip files are allowed') {
+  if (err?.message === `Only ${ALLOWED_UPLOAD_LABEL} files are allowed.`) {
     return res.status(400).json({ error: err.message })
   }
 
