@@ -129,7 +129,7 @@ export default function Overview() {
         />
       </div>
 
-      {!error && (
+      {data && !error && (
         <RadialOrbitalTimeline
           title="Dashboard orbit"
           description="Interactive map of the live workspace across clients, publishing, analytics, AI support, and admin controls."
