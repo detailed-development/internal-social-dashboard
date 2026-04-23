@@ -61,6 +61,22 @@ const GearIcon = () => (
   </svg>
 )
 
+const OrbitIcon = () => (
+  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="2" />
+    <ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-30 12 12)" />
+    <circle cx="20" cy="8" r="1.2" fill="currentColor" />
+  </svg>
+)
+
+const PluginsIcon = () => (
+  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 2v6" />
+    <path d="M15 2v6" />
+    <path d="M5 8h14a1 1 0 0 1 1 1v3a6 6 0 0 1-6 6h-.5V22h-3v-4H10a6 6 0 0 1-6-6V9a1 1 0 0 1 1-1z" />
+  </svg>
+)
+
 const CollapseIcon = ({ collapsed }) => (
   <svg className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="11 17 6 12 11 7" />
@@ -106,6 +122,22 @@ function getContext(pathname) {
       title: 'AI workspace',
       description: 'Keep content tools close while preserving access to clients and admin.',
       badge: 'Content tools',
+    }
+  }
+
+  if (pathname.startsWith('/overview-orbit')) {
+    return {
+      title: 'Orbit workspace',
+      description: 'Visualize the live workspace across clients, publishing, analytics, AI, and admin.',
+      badge: 'Orbit',
+    }
+  }
+
+  if (pathname.startsWith('/tools-plugins')) {
+    return {
+      title: 'Tools workspace',
+      description: 'Manage plugin uploads, versions, and distribution alongside client access.',
+      badge: 'Tools & Plugins',
     }
   }
 
@@ -224,8 +256,24 @@ export default function Layout() {
             <SidebarItem
               to="/"
               end
-              label="Overview"
+              label="Client Analytics"
               icon={<OverviewIcon />}
+              minimized={isMinimized}
+              activeClass={theme.navItemActive}
+              inactiveClass={theme.navItemInactive}
+            />
+            <SidebarItem
+              to="/overview-orbit"
+              label="Orbit"
+              icon={<OrbitIcon />}
+              minimized={isMinimized}
+              activeClass={theme.navItemActive}
+              inactiveClass={theme.navItemInactive}
+            />
+            <SidebarItem
+              to="/tools-plugins"
+              label="Tools & Plugins"
+              icon={<PluginsIcon />}
               minimized={isMinimized}
               activeClass={theme.navItemActive}
               inactiveClass={theme.navItemInactive}
