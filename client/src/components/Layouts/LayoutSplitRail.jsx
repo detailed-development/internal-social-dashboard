@@ -62,6 +62,14 @@ const PluginsIcon = () => (
   </svg>
 )
 
+const OrbitIcon = () => (
+  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="2" />
+    <ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-30 12 12)" />
+    <circle cx="20" cy="8" r="1.2" fill="currentColor" />
+  </svg>
+)
+
 const GearIcon = () => (
   <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -257,6 +265,14 @@ export default function Layout() {
               to="/"
               icon={<OverviewIcon />}
               label="Client Analytics"
+              isMinimized
+              activeClass={theme.navItemActive}
+              inactiveClass={theme.navItemInactive}
+            />
+            <NavButton
+              to="/overview-orbit"
+              icon={<OrbitIcon />}
+              label="Orbit"
               isMinimized
               activeClass={theme.navItemActive}
               inactiveClass={theme.navItemInactive}

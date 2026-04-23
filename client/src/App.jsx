@@ -11,6 +11,7 @@ const ClientDetail = lazy(() => import('./pages/ClientDetail'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AITools = lazy(() => import('./pages/AITools'))
 const ToolsPlugins = lazy(() => import('./pages/ToolsPlugins'))
+const OverviewOrbit = lazy(() => import('./pages/OverviewOrbit'))
 
 const bypassAuth = import.meta.env.VITE_BYPASS_AUTH === 'true'
 
@@ -49,6 +50,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/overview-orbit"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OverviewOrbit />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/tools-plugins"
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -82,6 +91,14 @@ export default function App() {
                     element={
                       <Suspense fallback={<PageLoader />}>
                         <AITools />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/overview-orbit"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <OverviewOrbit />
                       </Suspense>
                     }
                   />
