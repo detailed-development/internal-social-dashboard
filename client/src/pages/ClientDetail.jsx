@@ -1086,49 +1086,51 @@ export default function ClientDetail() {
             </div>
           )}
 
-          {/* Content Pillars — below charts */}
-          <ContentPillarsPanel
-            clientId={client.id}
-            posts={allPosts}
-            onFilterChange={setPillarFilter}
-            onPillarsChange={setPillars}
-            onPostPillarChange={applyPostPillarChange}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-start">
+            {/* Content Pillars — below charts */}
+            <ContentPillarsPanel
+              clientId={client.id}
+              posts={allPosts}
+              onFilterChange={setPillarFilter}
+              onPillarsChange={setPillars}
+              onPostPillarChange={applyPostPillarChange}
+            />
 
-          {/* Buzzwords — collapsible, closed on initial load */}
-          {filteredBuzz.length > 0 && (
-            <div className={`border rounded-xl mb-6 overflow-hidden ${theme.card}`}>
-              <button
-                type="button"
-                onClick={() => setBuzzOpen(v => !v)}
-                className="w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:opacity-80"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-semibold ${theme.heading}`}>Buzzwords</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${theme.code} ${theme.muted}`}>
-                    {filteredBuzz.length}
-                  </span>
-                </div>
-                <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${buzzOpen ? '' : '-rotate-90'} ${theme.muted}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
-              {buzzOpen && (
-                <div className={`border-t px-4 py-3 ${theme.cardDivider}`}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {filteredBuzz.slice(0, 20).map(b => (
-                      <span
-                        key={b.word}
-                        className={`px-2 py-0.5 rounded-full text-xs ${theme.buzzword}`}
-                      >
-                        {b.word}
-                      </span>
-                    ))}
+            {/* Buzzwords — collapsible, closed on initial load */}
+            {filteredBuzz.length > 0 && (
+              <div className={`border rounded-xl mb-6 overflow-hidden ${theme.card}`}>
+                <button
+                  type="button"
+                  onClick={() => setBuzzOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:opacity-80"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-semibold ${theme.heading}`}>Buzzwords</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${theme.code} ${theme.muted}`}>
+                      {filteredBuzz.length}
+                    </span>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                  <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${buzzOpen ? '' : '-rotate-90'} ${theme.muted}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                {buzzOpen && (
+                  <div className={`border-t px-4 py-3 ${theme.cardDivider}`}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {filteredBuzz.slice(0, 20).map(b => (
+                        <span
+                          key={b.word}
+                          className={`px-2 py-0.5 rounded-full text-xs ${theme.buzzword}`}
+                        >
+                          {b.word}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Per-platform sections */}
           {Object.keys(platforms).length > 0 && (
