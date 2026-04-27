@@ -121,18 +121,20 @@ model Post {
 }
 
 model PostMetric {
-  id             String   @id @default(uuid())
-  postId         String   @map("post_id")
-  impressions    Int      @default(0)
-  reach          Int      @default(0)
-  likes          Int      @default(0)
-  commentsCount  Int      @default(0) @map("comments_count")
-  shares         Int      @default(0)
-  saves          Int      @default(0)
-  videoPlays     Int      @default(0) @map("video_plays")
-  engagementRate Float?   @map("engagement_rate")
-  recordedAt     DateTime @default(now()) @map("recorded_at")
-  post           Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  postId          String   @map("post_id")
+  impressions     Int      @default(0)
+  reach           Int      @default(0)
+  likes           Int      @default(0)
+  commentsCount   Int      @default(0) @map("comments_count")
+  shares          Int      @default(0)
+  saves           Int      @default(0)
+  videoPlays      Int      @default(0) @map("video_plays")
+  profileVisits   Int      @default(0) @map("profile_visits")
+  followersGained Int      @default(0) @map("followers_gained")
+  engagementRate  Float?   @map("engagement_rate")
+  recordedAt      DateTime @default(now()) @map("recorded_at")
+  post            Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, recordedAt(sort: Desc)])
   @@map("post_metrics")
@@ -263,17 +265,7 @@ model AiGeneration {
   @@map("ai_generations")
 }
 
-// ─── Reporting read-model ──────────────────────────────────────────────────
 // Precomputed daily aggregates feeding Layer B (deterministic analytics).
-// Populated by src/lib/reporting/*-rollup.js after each successful sync and
-// by scripts/backfill-reporting-read-model.js for historical backfills.
-// These tables are optional: when USE_REPORTING_READ_MODEL is false, Layer B
-// falls back to raw-table aggregation. Cascade deletes from Client keep them
-// consistent.
-
-/// One row per (client, socialAccount, date, platform). Sums the latest-metric
-/// values across posts published on that date. Feeds platformTotals and
-/// dailyEngagement chart series.
 model ClientPlatformDailyMetric {
   id              String   @id @default(uuid())
   clientId        String   @map("client_id")
@@ -299,9 +291,6 @@ model ClientPlatformDailyMetric {
   @@map("client_platform_daily_metrics")
 }
 
-/// One row per post, denormalized for reporting. Feeds top-post queries and
-/// post-type breakdowns. Engagement is precomputed as likes + comments +
-/// shares + saves to match current ranking semantics exactly.
 model ClientPostPerformance {
   id              String    @id @default(uuid())
   clientId        String    @map("client_id")
@@ -329,8 +318,6 @@ model ClientPostPerformance {
   @@map("client_post_performance")
 }
 
-/// Daily overview totals from WebAnalytic rows where source='all' AND
-/// medium='all'. Feeds dailyTraffic and web KPI tiles.
 model ClientWebDailyMetric {
   id                 String   @id @default(uuid())
   clientId           String   @map("client_id")
@@ -350,8 +337,6 @@ model ClientWebDailyMetric {
   @@map("client_web_daily_metrics")
 }
 
-/// Source/medium breakdown by day. Populated from WebAnalytic rows where
-/// source NOT IN ('all','_device','_page').
 model ClientTrafficSourceDaily {
   id        String   @id @default(uuid())
   clientId  String   @map("client_id")
@@ -371,8 +356,6 @@ model ClientTrafficSourceDaily {
   @@map("client_traffic_source_daily")
 }
 
-/// Device breakdown by day. Populated from WebAnalytic rows where
-/// source='_device' (medium holds the device name).
 model ClientDeviceDaily {
   id        String   @id @default(uuid())
   clientId  String   @map("client_id")
@@ -390,8 +373,6 @@ model ClientDeviceDaily {
   @@map("client_device_daily")
 }
 
-/// Top-page breakdown by day. Populated from WebAnalytic rows where
-/// source='_page' (medium holds the page path).
 model ClientPageDaily {
   id        String   @id @default(uuid())
   clientId  String   @map("client_id")
@@ -409,8 +390,6 @@ model ClientPageDaily {
   @@map("client_page_daily")
 }
 
-/// Date-scoped buzzword aggregates (fixes the current client-only aggregation
-/// path in gatherClientAnalytics).
 model ClientBuzzwordDaily {
   id        String   @id @default(uuid())
   clientId  String   @map("client_id")
@@ -484,9 +463,6 @@ model PostContentPillar {
   @@map("post_content_pillars")
 }
 
-/// Optional observability: stores the prompt-input JSON used for a given
-/// (client, feature, dateRange, inputVersion) so we can diff regenerated
-/// prompts over time.
 model ClientReportInputSnapshot {
   id             String   @id @default(uuid())
   clientId       String   @map("client_id")
@@ -504,18 +480,12 @@ model ClientReportInputSnapshot {
   @@map("client_report_input_snapshots")
 }
 
-// Custom plugins/tools uploaded by the user. Stored as rows in the DB and
-// rendered as nodes in the Tools & Plugins page. Free-form `category` is a
-// plain string so users can add arbitrary groupings without a second table.
 model Plugin {
   id              String    @id @default(cuid())
   title           String
   category        String    @default("General")
   description     String?
   content         String?
-  // The fields below mirror the *current* PluginVersion so reads stay cheap.
-  // When a new version is uploaded they are updated to point to it; prior
-  // versions are retained in the plugin_versions table.
   version         String?
   downloadUrl     String?   @map("download_url")
   fileName        String?   @map("file_name")
@@ -536,9 +506,6 @@ model Plugin {
   @@map("plugins")
 }
 
-// History of file uploads for a Plugin. The Plugin table mirrors the latest
-// row's storage fields for cheap reads; deleting a row here also removes the
-// backing object from Bunny in the /api/plugins/:id/versions/:vid handler.
 model PluginVersion {
   id              String    @id @default(cuid())
   pluginId        String    @map("plugin_id")
@@ -561,9 +528,6 @@ model PluginVersion {
   @@map("plugin_versions")
 }
 
-// App passwords are scoped per client + platform. Locked/obfuscated in the UI
-// by default; each edit writes a new history row so we can display who changed
-// it and when.
 model PlatformAppPassword {
   id        String                       @id @default(cuid())
   clientId  String                       @map("client_id")
