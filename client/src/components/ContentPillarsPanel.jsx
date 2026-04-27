@@ -39,9 +39,11 @@ export default function ContentPillarsPanel({
   if (loading) return null
 
   return (
-    <div className="mb-8 space-y-4">
+    <>
       {pillars.length > 0 && (
-        <PillarAnalyticsPanel pillars={pillars} posts={posts} />
+        <div className="col-span-full mb-4">
+          <PillarAnalyticsPanel pillars={pillars} posts={posts} />
+        </div>
       )}
 
       <div className={`border rounded-xl overflow-hidden ${theme.card}`}>
@@ -85,6 +87,6 @@ export default function ContentPillarsPanel({
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 }
