@@ -28,6 +28,49 @@ function getStatusTone(theme, state) {
   }
 }
 
+function skeletonTone(theme) {
+  return theme.id === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+}
+
+function FreshnessSkeleton({ variant, theme }) {
+  if (variant === 'compact') {
+    return (
+      <div className="relative mb-4 min-h-[28px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          {['Social', 'Messages', 'Website', 'Transcribed'].map((label) => (
+            <span
+              key={label}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${theme.id === 'dark' ? 'border-gray-700 bg-gray-800 text-gray-500' : 'border-gray-200 bg-gray-50 text-gray-400'}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${skeletonTone(theme)}`} />
+              {label}
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4 min-h-[156px]">
+      <div className="flex items-end justify-between gap-3 mb-3">
+        <div>
+          <h3 className={`text-sm font-semibold ${theme.heading}`}>Freshness Stats</h3>
+          <p className={`text-xs ${theme.subtext}`}>Loading source freshness...</p>
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+        {[4, 4, 2, 2].map((span, index) => (
+          <div key={index} className={`rounded-xl border p-4 shadow-sm ${theme.card} ${theme.id === 'dark' ? 'border-gray-700' : 'border-gray-200'} xl:col-span-${span}`}>
+            <div className={`h-3 rounded w-24 animate-pulse ${skeletonTone(theme)}`} />
+            <div className={`mt-3 h-5 rounded w-36 animate-pulse ${skeletonTone(theme)}`} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function StatusPill({ state, theme }) {
   const tone = getStatusTone(theme, state)
   const label = state === 'unknown' ? 'Unknown' : state[0].toUpperCase() + state.slice(1)
@@ -111,7 +154,7 @@ function PillWithCard({ label, value, state, theme, children }) {
 export default function FreshnessBadges({ freshness, variant = 'full' }) {
   const { theme } = useTheme()
 
-  if (!freshness) return null
+  if (!freshness) return <FreshnessSkeleton variant={variant} theme={theme} />
 
   const socialContent = freshness.socialLastChangedAt ?? freshness.socialLastSyncedAt
   const socialMetrics = freshness.socialMetricsLastRefreshedAt ?? freshness.socialLastSyncedAt
@@ -126,7 +169,7 @@ export default function FreshnessBadges({ freshness, variant = 'full' }) {
 
   if (variant === 'compact') {
     return (
-      <div className="relative mb-4">
+      <div className="relative mb-4 min-h-[28px]">
         <div className="flex items-center gap-2 flex-wrap cursor-default">
           <PillWithCard
             label="Social"
@@ -207,7 +250,7 @@ export default function FreshnessBadges({ freshness, variant = 'full' }) {
 
   // Full variant (kept for backwards compatibility, no longer used in Social tab)
   return (
-    <div className="mb-4">
+    <div className="mb-4 min-h-[156px]">
       <div className="flex items-end justify-between gap-3 mb-3">
         <div>
           <h3 className={`text-sm font-semibold ${theme.heading}`}>Freshness Stats</h3>
