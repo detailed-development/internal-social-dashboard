@@ -9,7 +9,7 @@ function formatMetric(value) {
 
 const METRIC_CONFIG = [
   { label: 'Reach', key: 'reach' },
-  { label: 'Impressions', key: 'impressions' },
+  { label: 'Views', key: 'videoPlays' },
   { label: 'Profile visits', key: 'profileVisits' },
   { label: 'Followers gained', key: 'followersGained' },
   { label: 'Likes', key: 'likes' },
