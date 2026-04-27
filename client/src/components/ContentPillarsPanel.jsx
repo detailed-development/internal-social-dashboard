@@ -4,6 +4,7 @@ import ContentPillarsHeader from './content-pillars/ContentPillarsHeader'
 import PillarsList from './content-pillars/PillarsList'
 import CreatePillarForm from './content-pillars/CreatePillarForm'
 import PillarPostAssignments from './content-pillars/PillarPostAssignments'
+import PillarAnalyticsPanel from './content-pillars/PillarAnalyticsPanel'
 
 export default function ContentPillarsPanel({
   clientId,
@@ -48,6 +49,10 @@ export default function ContentPillarsPanel({
 
       {open && (
         <div className={`border-t px-5 py-4 space-y-4 ${theme.cardDivider}`}>
+          <p className={`text-xs ${theme.muted}`}>
+            Content Pillars are saved to the database for this client, so they are shared across users and are not removed when a browser clears localStorage.
+          </p>
+
           <PillarsList
             pillars={pillars}
             editingId={editingId}
@@ -64,6 +69,8 @@ export default function ContentPillarsPanel({
             onColorChange={actions.setNewColor}
             onSubmit={actions.createPillar}
           />
+
+          <PillarAnalyticsPanel pillars={pillars} posts={posts} />
 
           <PillarPostAssignments
             posts={posts}
