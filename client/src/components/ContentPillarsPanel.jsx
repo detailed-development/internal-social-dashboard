@@ -39,48 +39,52 @@ export default function ContentPillarsPanel({
   if (loading) return null
 
   return (
-    <div className={`border rounded-xl mb-8 overflow-hidden ${theme.card}`}>
-      <ContentPillarsHeader
-        count={pillars.length}
-        isOpen={open}
-        selectedPillar={activePillar}
-        onToggle={actions.toggleOpen}
-      />
-
-      {open && (
-        <div className={`border-t px-5 py-4 space-y-4 ${theme.cardDivider}`}>
-          <p className={`text-xs ${theme.muted}`}>
-            Content Pillars are saved to the database for this client, so they are shared across users and are not removed when a browser clears localStorage.
-          </p>
-
-          <PillarsList
-            pillars={pillars}
-            editingId={editingId}
-            editName={editName}
-            selectedPillarId={selectedPillarId}
-            actions={actions}
-          />
-
-          <CreatePillarForm
-            newName={newName}
-            newColor={newColor}
-            creating={creating}
-            onNameChange={actions.setNewName}
-            onColorChange={actions.setNewColor}
-            onSubmit={actions.createPillar}
-          />
-
-          <PillarAnalyticsPanel pillars={pillars} posts={posts} />
-
-          <PillarPostAssignments
-            posts={posts}
-            selectedPillarId={selectedPillarId}
-            activePillarName={activePillar?.name}
-            assigningPostId={assigningPostId}
-            onToggleAssignment={actions.togglePostAssignment}
-          />
-        </div>
+    <div className="mb-8 space-y-4">
+      {pillars.length > 0 && (
+        <PillarAnalyticsPanel pillars={pillars} posts={posts} />
       )}
+
+      <div className={`border rounded-xl overflow-hidden ${theme.card}`}>
+        <ContentPillarsHeader
+          count={pillars.length}
+          isOpen={open}
+          selectedPillar={activePillar}
+          onToggle={actions.toggleOpen}
+        />
+
+        {open && (
+          <div className={`border-t px-5 py-4 space-y-4 ${theme.cardDivider}`}>
+            <p className={`text-xs ${theme.muted}`}>
+              Content Pillars are saved to the database for this client, so they are shared across users and are not removed when a browser clears localStorage.
+            </p>
+
+            <PillarsList
+              pillars={pillars}
+              editingId={editingId}
+              editName={editName}
+              selectedPillarId={selectedPillarId}
+              actions={actions}
+            />
+
+            <CreatePillarForm
+              newName={newName}
+              newColor={newColor}
+              creating={creating}
+              onNameChange={actions.setNewName}
+              onColorChange={actions.setNewColor}
+              onSubmit={actions.createPillar}
+            />
+
+            <PillarPostAssignments
+              posts={posts}
+              selectedPillarId={selectedPillarId}
+              activePillarName={activePillar?.name}
+              assigningPostId={assigningPostId}
+              onToggleAssignment={actions.togglePostAssignment}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
