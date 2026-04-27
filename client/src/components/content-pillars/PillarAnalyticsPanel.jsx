@@ -176,6 +176,7 @@ function strongestBreakdown(row, bucketKey) {
 export default function PillarAnalyticsPanel({ pillars, posts }) {
   const { theme } = useTheme()
   const [metricKey, setMetricKey] = useState('reach')
+  const [isOpen, setIsOpen] = useState(true)
 
   const analytics = useMemo(() => buildPillarAnalytics(pillars, posts), [pillars, posts])
   const activeRows = analytics.filter((row) => row.posts > 0)
@@ -192,99 +193,126 @@ export default function PillarAnalyticsPanel({ pillars, posts }) {
   const strongestTime = strongestBreakdown(growth, 'byTime')
 
   return (
-    <div className="space-y-4">
-      <div className={`rounded-xl border p-4 ${theme.id === 'dark' ? 'border-gray-600 bg-gray-800/40' : 'border-gray-200 bg-gray-50'}`}>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div>
-            <p className={`text-sm font-semibold ${theme.heading}`}>Pillar comparison</p>
-            <p className={`text-xs ${theme.muted}`}>Compare each content pillar by reach, action, trust, growth, velocity, and engagement metrics.</p>
-          </div>
-          <select
-            value={metricKey}
-            onChange={(event) => setMetricKey(event.target.value)}
-            className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`}
-          >
-            {METRIC_OPTIONS.map((metric) => (
-              <option key={metric.key} value={metric.key}>{metric.label}</option>
-            ))}
-          </select>
+    <div className={`rounded-xl border overflow-hidden ${theme.card}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:opacity-80"
+        aria-expanded={isOpen}
+      >
+        <div>
+          <p className={`text-sm font-semibold ${theme.heading}`}>Pillar comparison</p>
+          <p className={`text-xs ${theme.muted}`}>Compare pillars by reach, action, trust, growth, velocity, and engagement.</p>
         </div>
+        <svg
+          className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'} ${theme.muted}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
 
-        {activeRows.length > 0 ? (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={activeRows} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={theme.chart.grid} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: theme.chart.tickFill }} />
-              <YAxis tick={{ fontSize: 11, fill: theme.chart.tickFill }} />
-              <Tooltip
-                formatter={(value) => [formatNumber(value), selectedMetric.label]}
-                contentStyle={{ backgroundColor: theme.chart.tooltipBg, borderColor: theme.chart.grid }}
-              />
-              <Bar dataKey={metricKey} name={selectedMetric.label} fill={theme.chart.bar1} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <p className={`text-xs ${theme.muted}`}>Assign posts to pillars to populate comparison analytics.</p>
-        )}
-      </div>
+      {isOpen && (
+        <div className={`border-t px-5 py-4 space-y-4 ${theme.cardDivider}`}>
+          <div className={`rounded-xl border p-4 ${theme.id === 'dark' ? 'border-gray-600 bg-gray-800/40' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div>
+                <p className={`text-sm font-semibold ${theme.heading}`}>{selectedMetric.label} by pillar</p>
+                <p className={`text-xs ${theme.muted}`}>Switch the metric to compare Pillar A vs. Pillar B vs. Pillar C.</p>
+              </div>
+              <select
+                value={metricKey}
+                onChange={(event) => setMetricKey(event.target.value)}
+                className={`text-sm rounded-lg px-3 py-1.5 ${theme.input}`}
+              >
+                {METRIC_OPTIONS.map((metric) => (
+                  <option key={metric.key} value={metric.key}>{metric.label}</option>
+                ))}
+              </select>
+            </div>
 
-      {activeRows.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {[
-            {
-              title: 'Growing the audience',
-              row: growth,
-              detail: growth ? `${formatNumber(growth.reach)} reach · ${formatNumber(growth.impressions)} impressions · ${formatNumber(growth.followersGained)} followers gained` : 'No signal yet',
-            },
-            {
-              title: 'Deepening trust',
-              row: trust,
-              detail: trust ? `${formatNumber(trust.comments)} comments · ${formatNumber(trust.saves)} saves · ${formatNumber(trust.questions + trust.compliments)} relationship comments` : 'No signal yet',
-            },
-            {
-              title: 'Driving action',
-              row: action,
-              detail: action ? `${formatNumber(action.shares)} shares · ${formatNumber(action.profileVisits)} profile visits · ${formatNumber(action.purchaseSignals)} purchase signals` : 'No signal yet',
-            },
-            {
-              title: 'Doing nothing',
-              row: inactive,
-              detail: inactive ? `${formatNumber(inactive.engagement)} engagement · ${formatNumber(inactive.reach)} reach across ${inactive.posts} posts` : 'No signal yet',
-            },
-          ].map((card) => (
-            <div key={card.title} className={`rounded-xl border p-4 ${theme.card}`}>
-              <p className={`text-xs font-semibold uppercase tracking-wide ${theme.subtext}`}>{card.title}</p>
-              <p className={`mt-1 text-base font-semibold ${theme.heading}`}>{card.row?.name || 'Not enough data'}</p>
-              <p className={`mt-1 text-xs ${theme.muted}`}>{card.detail}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activeRows.length > 0 && (
-        <div className={`rounded-xl border p-4 ${theme.card}`}>
-          <p className={`text-sm font-semibold mb-2 ${theme.heading}`}>Content velocity + timing read</p>
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 text-xs ${theme.body}`}>
-            <div>
-              <p className={`font-semibold ${theme.subtext}`}>Strongest content type</p>
-              <p>{strongestType ? `${strongestType.name}: ${formatNumber(strongestType.engagement)} engagement from ${strongestType.posts} posts` : 'Not enough tagged posts yet.'}</p>
-            </div>
-            <div>
-              <p className={`font-semibold ${theme.subtext}`}>Best day signal</p>
-              <p>{strongestDay ? `${strongestDay.name}: ${formatNumber(strongestDay.reach)} reach and ${formatNumber(strongestDay.engagement)} engagement` : 'Not enough tagged posts yet.'}</p>
-            </div>
-            <div>
-              <p className={`font-semibold ${theme.subtext}`}>Best time window</p>
-              <p>{strongestTime ? `${strongestTime.name}: ${formatNumber(strongestTime.reach)} reach and ${formatNumber(strongestTime.engagement)} engagement` : 'Not enough tagged posts yet.'}</p>
-            </div>
+            {activeRows.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={activeRows} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.chart.grid} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: theme.chart.tickFill }} />
+                  <YAxis tick={{ fontSize: 11, fill: theme.chart.tickFill }} />
+                  <Tooltip
+                    formatter={(value) => [formatNumber(value), selectedMetric.label]}
+                    contentStyle={{ backgroundColor: theme.chart.tooltipBg, borderColor: theme.chart.grid }}
+                  />
+                  <Bar dataKey={metricKey} name={selectedMetric.label} fill={theme.chart.bar1} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className={`text-xs ${theme.muted}`}>Assign posts to pillars to populate comparison analytics.</p>
+            )}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {activeRows.map((row) => (
-              <span key={row.id} className={`text-xs px-2 py-1 rounded-full ${theme.code} ${theme.muted}`}>
-                {row.name}: {row.avgDaysBetweenPosts ? `${row.avgDaysBetweenPosts.toFixed(1)} days/post` : 'single post'}
-              </span>
-            ))}
-          </div>
+
+          {activeRows.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                {
+                  title: 'Growing the audience',
+                  row: growth,
+                  detail: growth ? `${formatNumber(growth.reach)} reach · ${formatNumber(growth.impressions)} impressions · ${formatNumber(growth.followersGained)} followers gained` : 'No signal yet',
+                },
+                {
+                  title: 'Deepening trust',
+                  row: trust,
+                  detail: trust ? `${formatNumber(trust.comments)} comments · ${formatNumber(trust.saves)} saves · ${formatNumber(trust.questions + trust.compliments)} relationship comments` : 'No signal yet',
+                },
+                {
+                  title: 'Driving action',
+                  row: action,
+                  detail: action ? `${formatNumber(action.shares)} shares · ${formatNumber(action.profileVisits)} profile visits · ${formatNumber(action.purchaseSignals)} purchase signals` : 'No signal yet',
+                },
+                {
+                  title: 'Doing nothing',
+                  row: inactive,
+                  detail: inactive ? `${formatNumber(inactive.engagement)} engagement · ${formatNumber(inactive.reach)} reach across ${inactive.posts} posts` : 'No signal yet',
+                },
+              ].map((card) => (
+                <div key={card.title} className={`rounded-xl border p-4 ${theme.card}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${theme.subtext}`}>{card.title}</p>
+                  <p className={`mt-1 text-base font-semibold ${theme.heading}`}>{card.row?.name || 'Not enough data'}</p>
+                  <p className={`mt-1 text-xs ${theme.muted}`}>{card.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeRows.length > 0 && (
+            <div className={`rounded-xl border p-4 ${theme.card}`}>
+              <p className={`text-sm font-semibold mb-2 ${theme.heading}`}>Content velocity + timing read</p>
+              <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 text-xs ${theme.body}`}>
+                <div>
+                  <p className={`font-semibold ${theme.subtext}`}>Strongest content type</p>
+                  <p>{strongestType ? `${strongestType.name}: ${formatNumber(strongestType.engagement)} engagement from ${strongestType.posts} posts` : 'Not enough tagged posts yet.'}</p>
+                </div>
+                <div>
+                  <p className={`font-semibold ${theme.subtext}`}>Best day signal</p>
+                  <p>{strongestDay ? `${strongestDay.name}: ${formatNumber(strongestDay.reach)} reach and ${formatNumber(strongestDay.engagement)} engagement` : 'Not enough tagged posts yet.'}</p>
+                </div>
+                <div>
+                  <p className={`font-semibold ${theme.subtext}`}>Best time window</p>
+                  <p>{strongestTime ? `${strongestTime.name}: ${formatNumber(strongestTime.reach)} reach and ${formatNumber(strongestTime.engagement)} engagement` : 'Not enough tagged posts yet.'}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {activeRows.map((row) => (
+                  <span key={row.id} className={`text-xs px-2 py-1 rounded-full ${theme.code} ${theme.muted}`}>
+                    {row.name}: {row.avgDaysBetweenPosts ? `${row.avgDaysBetweenPosts.toFixed(1)} days/post` : 'single post'}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
