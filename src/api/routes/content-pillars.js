@@ -1,8 +1,36 @@
 import { Router } from 'express';
 const router = Router();
 
+async function validatePostBelongsToPillarClient(prisma, pillarId, postId) {
+  const [pillar, post] = await Promise.all([
+    prisma.contentPillar.findUnique({
+      where: { id: pillarId },
+      select: { id: true, clientId: true },
+    }),
+    prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        socialAccount: {
+          select: { clientId: true },
+        },
+      },
+    }),
+  ]);
+
+  if (!pillar) return { status: 404, error: 'Pillar not found' };
+  if (!post) return { status: 404, error: 'Post not found' };
+
+  const postClientId = post.socialAccount?.clientId;
+  if (postClientId !== pillar.clientId) {
+    return { status: 400, error: 'Post does not belong to this pillar client' };
+  }
+
+  return { pillar, post };
+}
+
 // GET /api/content-pillars?clientId=:clientId
-// List all content pillars for a client, with post count.
+// List all persisted content pillars for a client, with post count.
 router.get('/', async (req, res) => {
   const prisma = req.app.get('prisma');
   const { clientId } = req.query;
@@ -20,7 +48,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/content-pillars
-// Create a new content pillar for a client.
+// Create a new persisted content pillar for a client.
 router.post('/', async (req, res) => {
   const prisma = req.app.get('prisma');
   const { clientId, name, description, color } = req.body;
@@ -69,10 +97,13 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/content-pillars/:id/posts/:postId
-// Assign a post to a pillar (idempotent).
+// Assign a post to a pillar (idempotent). The post must belong to the same client as the pillar.
 router.post('/:id/posts/:postId', async (req, res) => {
   const prisma = req.app.get('prisma');
   try {
+    const validation = await validatePostBelongsToPillarClient(prisma, req.params.id, req.params.postId);
+    if (validation.error) return res.status(validation.status).json({ error: validation.error });
+
     await prisma.postContentPillar.upsert({
       where: { postId_contentPillarId: { postId: req.params.postId, contentPillarId: req.params.id } },
       create: { postId: req.params.postId, contentPillarId: req.params.id },
@@ -85,10 +116,13 @@ router.post('/:id/posts/:postId', async (req, res) => {
 });
 
 // DELETE /api/content-pillars/:id/posts/:postId
-// Unassign a post from a pillar.
+// Unassign a post from a pillar. The post must belong to the same client as the pillar.
 router.delete('/:id/posts/:postId', async (req, res) => {
   const prisma = req.app.get('prisma');
   try {
+    const validation = await validatePostBelongsToPillarClient(prisma, req.params.id, req.params.postId);
+    if (validation.error) return res.status(validation.status).json({ error: validation.error });
+
     await prisma.postContentPillar.delete({
       where: { postId_contentPillarId: { postId: req.params.postId, contentPillarId: req.params.id } },
     });
