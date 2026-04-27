@@ -3,7 +3,39 @@ import { transcribeReel } from '../transcribe.js';
 const GRAPH_API = 'https://graph.facebook.com/v19.0';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;
+
+async function fetchMediaInsights(mediaId, metricNames, accessToken) {
+  const values = {};
+
+  async function requestMetrics(names) {
+    const insightsRes = await axios.get(`${GRAPH_API}/${mediaId}/insights`, {
+      params: { metric: names.join(','), access_token: accessToken },
+    });
+    for (const metric of insightsRes.data.data ?? []) {
+      values[metric.name] = metric.values?.[0]?.value || 0;
+    }
+  }
+
+  try {
+    await requestMetrics(metricNames);
+    return values;
+  } catch (batchErr) {
+    console.warn(`[instagram] batch insights fetch failed for post ${mediaId}; retrying metrics individually:`, batchErr.response?.data ?? batchErr.message);
+  }
+
+  for (const metricName of metricNames) {
+    try {
+      await requestMetrics([metricName]);
+    } catch (err) {
+      // Some Graph API metrics are only available for certain media types,
+      // account types, token scopes, or API versions. Keep the rest of the
+      // insight payload instead of zeroing all metrics because one failed.
+      console.warn(`[instagram] insight metric ${metricName} unavailable for post ${mediaId}:`, err.response?.data ?? err.message);
+    }
+  }
+
+  return values;
+}
 
 export async function syncInstagram(prisma, account) {
   const { accessToken, platformUserId } = account;
@@ -67,21 +99,19 @@ export async function syncInstagram(prisma, account) {
 
     // Richer insights only for posts < 30 days old (older ones don't update)
     const postAge = Date.now() - new Date(item.timestamp).getTime();
-    let impressions = 0, reach = 0, shares = 0, saves = 0;
+    let impressions = 0, reach = 0, shares = 0, saves = 0, profileVisits = 0, followersGained = 0;
     if (postAge < THIRTY_DAYS) {
-      try {
-        const insightsRes = await axios.get(`${GRAPH_API}/${item.id}/insights`, {
-          params: { metric: 'impressions,reach,saved,shares', access_token: accessToken },
-        });
-        for (const m of insightsRes.data.data) {
-          if (m.name === 'impressions') impressions = m.values?.[0]?.value || 0;
-          if (m.name === 'reach')       reach       = m.values?.[0]?.value || 0;
-          if (m.name === 'saved')       saves       = m.values?.[0]?.value || 0;
-          if (m.name === 'shares')      shares      = m.values?.[0]?.value || 0;
-        }
-      } catch (err) {
-        console.warn(`[instagram] insights fetch failed for post ${item.id}:`, err.message);
-      }
+      const insights = await fetchMediaInsights(
+        item.id,
+        ['impressions', 'reach', 'saved', 'shares', 'profile_visits', 'follows'],
+        accessToken,
+      );
+      impressions     = insights.impressions     || 0;
+      reach           = insights.reach           || 0;
+      saves           = insights.saved           || 0;
+      shares          = insights.shares          || 0;
+      profileVisits   = insights.profile_visits  || 0;
+      followersGained = insights.follows         || 0;
     }
 
     // Upsert metric — update latest row if exists, otherwise create
@@ -90,14 +120,26 @@ export async function syncInstagram(prisma, account) {
       orderBy: { recordedAt: 'desc' },
       select: { id: true },
     });
+    const metricData = {
+      likes,
+      commentsCount: comments,
+      impressions,
+      reach,
+      shares,
+      saves,
+      profileVisits,
+      followersGained,
+      recordedAt: new Date(),
+    };
+
     if (existing) {
       await prisma.postMetric.update({
         where: { id: existing.id },
-        data: { likes, commentsCount: comments, impressions, reach, shares, saves, recordedAt: new Date() },
+        data: metricData,
       });
     } else {
       await prisma.postMetric.create({
-        data: { postId: post.id, likes, commentsCount: comments, impressions, reach, shares, saves, videoPlays: 0 },
+        data: { postId: post.id, ...metricData, videoPlays: 0 },
       });
     }
 
