@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTheme } from '../../ThemeContext'
 
 function SkeletonRows({ theme }) {
@@ -13,15 +13,24 @@ function SkeletonRows({ theme }) {
 
 export default function AILoadingState({ loading, error, onRetry, children }) {
   const { theme } = useTheme()
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const hasContent = Boolean(children)
 
+  // Keep the initial Client Details layout stable by rendering this shell
+  // collapsed. Once the user generates insights, expand automatically so the
+  // loader/result/error is visible without requiring a second click.
+  useEffect(() => {
+    if (loading || error || hasContent) {
+      setIsOpen(true)
+    }
+  }, [loading, error, hasContent])
+
   return (
-    <div className={`rounded-xl border overflow-hidden ${theme.card}`}>
+    <div className={`rounded-xl border overflow-hidden min-h-[76px] ${theme.card}`}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:opacity-80"
+        className="w-full min-h-[76px] flex items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:opacity-80"
         aria-expanded={isOpen}
       >
         <div>
