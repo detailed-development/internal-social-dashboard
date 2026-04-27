@@ -4,33 +4,37 @@ const GRAPH_API = 'https://graph.facebook.com/v19.0';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
-async function fetchMediaInsights(mediaId, metricNames, accessToken) {
+const CORE_MEDIA_METRICS = ['reach', 'saved', 'shares', 'views', 'total_interactions'];
+const OPTIONAL_ACTION_METRICS = ['profile_visits', 'follows'];
+const UNSUPPORTED_LOGGED = new Set();
+
+function logUnsupportedMetricOnce(metricName, mediaProductType, err) {
+  const key = `${mediaProductType || 'UNKNOWN'}:${metricName}`;
+  if (UNSUPPORTED_LOGGED.has(key)) return;
+  UNSUPPORTED_LOGGED.add(key);
+  console.warn(
+    `[instagram] insight metric ${metricName} unavailable for ${mediaProductType || 'unknown media type'}; suppressing repeat logs:`,
+    err.response?.data ?? err.message,
+  );
+}
+
+async function fetchMediaInsights(mediaId, metricNames, accessToken, mediaProductType) {
   const values = {};
-
-  async function requestMetrics(names) {
-    const insightsRes = await axios.get(`${GRAPH_API}/${mediaId}/insights`, {
-      params: { metric: names.join(','), access_token: accessToken },
-    });
-    for (const metric of insightsRes.data.data ?? []) {
-      values[metric.name] = metric.values?.[0]?.value || 0;
-    }
-  }
-
-  try {
-    await requestMetrics(metricNames);
-    return values;
-  } catch (batchErr) {
-    console.warn(`[instagram] batch insights fetch failed for post ${mediaId}; retrying metrics individually:`, batchErr.response?.data ?? batchErr.message);
-  }
 
   for (const metricName of metricNames) {
     try {
-      await requestMetrics([metricName]);
+      const insightsRes = await axios.get(`${GRAPH_API}/${mediaId}/insights`, {
+        params: { metric: metricName, access_token: accessToken },
+      });
+      for (const metric of insightsRes.data.data ?? []) {
+        values[metric.name] = metric.values?.[0]?.value || 0;
+      }
     } catch (err) {
-      // Some Graph API metrics are only available for certain media types,
-      // account types, token scopes, or API versions. Keep the rest of the
-      // insight payload instead of zeroing all metrics because one failed.
-      console.warn(`[instagram] insight metric ${metricName} unavailable for post ${mediaId}:`, err.response?.data ?? err.message);
+      // Meta's current Media Insights matrix is media-type dependent. In v22+
+      // impressions is no longer supported for queried media, and profile action
+      // metrics only exist for some product types. Unsupported metrics should not
+      // block supported reach/views/saves/shares from syncing.
+      logUnsupportedMetricOnce(metricName, mediaProductType, err);
     }
   }
 
@@ -63,7 +67,7 @@ export async function syncInstagram(prisma, account) {
   // Fetch only new media since last sync
   const mediaRes = await axios.get(`${GRAPH_API}/${platformUserId}/media`, {
     params: {
-      fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+      fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
       limit: 25,
       since,
       access_token: accessToken,
@@ -94,27 +98,32 @@ export async function syncInstagram(prisma, account) {
       },
     });
 
-    const likes    = item.like_count    || 0;
+    const likes = item.like_count || 0;
     const comments = item.comments_count || 0;
 
-    // Richer insights only for posts < 30 days old (older ones don't update)
+    // Richer insights only for posts < 30 days old (older ones don't update).
+    // Do not request legacy impressions for Instagram media. Meta v22+ rejects
+    // impressions for multiple product types; views is the supported top-funnel
+    // replacement where available.
     const postAge = Date.now() - new Date(item.timestamp).getTime();
-    let impressions = 0, reach = 0, shares = 0, saves = 0, profileVisits = 0, followersGained = 0;
+    let reach = 0, shares = 0, saves = 0, views = 0, profileVisits = 0, followersGained = 0;
     if (postAge < THIRTY_DAYS) {
       const insights = await fetchMediaInsights(
         item.id,
-        ['impressions', 'reach', 'saved', 'shares', 'profile_visits', 'follows'],
+        [...CORE_MEDIA_METRICS, ...OPTIONAL_ACTION_METRICS],
         accessToken,
+        item.media_product_type || item.media_type,
       );
-      impressions     = insights.impressions     || 0;
-      reach           = insights.reach           || 0;
-      saves           = insights.saved           || 0;
-      shares          = insights.shares          || 0;
-      profileVisits   = insights.profile_visits  || 0;
-      followersGained = insights.follows         || 0;
+      reach = insights.reach || 0;
+      saves = insights.saved || 0;
+      shares = insights.shares || 0;
+      views = insights.views || 0;
+      profileVisits = insights.profile_visits || 0;
+      followersGained = insights.follows || 0;
     }
 
-    // Upsert metric — update latest row if exists, otherwise create
+    // Upsert metric — update latest row if exists, otherwise create. Keep
+    // impressions untouched for existing rows because it is now legacy data.
     const existing = await prisma.postMetric.findFirst({
       where: { postId: post.id },
       orderBy: { recordedAt: 'desc' },
@@ -123,10 +132,10 @@ export async function syncInstagram(prisma, account) {
     const metricData = {
       likes,
       commentsCount: comments,
-      impressions,
       reach,
       shares,
       saves,
+      videoPlays: views,
       profileVisits,
       followersGained,
       recordedAt: new Date(),
@@ -139,7 +148,7 @@ export async function syncInstagram(prisma, account) {
       });
     } else {
       await prisma.postMetric.create({
-        data: { postId: post.id, ...metricData, videoPlays: 0 },
+        data: { postId: post.id, ...metricData },
       });
     }
 
