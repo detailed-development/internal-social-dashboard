@@ -4,8 +4,9 @@ import CaptionGenerator from '../components/ai/CaptionGenerator'
 import HashtagExtractor from '../components/ai/HashtagExtractor'
 import ContentRewriter from '../components/ai/ContentRewriter'
 import ReportDraftGenerator from '../components/ai/ReportDraftGenerator'
+import ImagePromptGenerator from '../components/ai/ImagePromptGenerator'
 
-const TABS = ['Captions', 'Hashtags', 'Rewriter', 'Report Draft']
+const TABS = ['Captions', 'Images', 'Hashtags', 'Rewriter', 'Report Draft']
 
 export default function AITools() {
   const { theme } = useTheme()
@@ -35,6 +36,7 @@ export default function AITools() {
 
       {/* Tab content */}
       {tab === 'Captions' && <CaptionGenerator />}
+      {tab === 'Images' && <ImagePromptGenerator />}
       {tab === 'Hashtags' && <HashtagExtractor />}
       {tab === 'Rewriter' && <ContentRewriter />}
       {tab === 'Report Draft' && <ReportDraftGenerator />}
