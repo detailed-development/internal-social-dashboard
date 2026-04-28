@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { isAIAvailable } from '../../lib/ai/ai-client.js';
 import { generateWeeklyInsights, generateReportDraft } from '../../lib/ai/analytics-ai.js';
-import { generateCaption, extractHashtags, rewriteContent } from '../../lib/ai/content-ai.js';
+import { generateCaption, extractHashtags, rewriteContent, generateImagePrompt } from '../../lib/ai/content-ai.js';
 import { loadTemplate } from '../../lib/ai/prompt-template.js';
 import { hashInput, computeCacheKey, getCachedResponse } from '../../lib/ai/cache.js';
 
@@ -16,9 +16,10 @@ const COST_ESTIMATES = {
   'caption-generator': { inputTokens: 400,  maxOutputTokens: 1024 },
   'hashtag-extractor': { inputTokens: 300,  maxOutputTokens: 512 },
   'content-rewriter':  { inputTokens: 500,  maxOutputTokens: 1024 },
+  'image-prompt-generator': { inputTokens: 350, maxOutputTokens: 512 },
 };
 
-const CONTENT_FEATURES = new Set(['caption-generator', 'hashtag-extractor', 'content-rewriter']);
+const CONTENT_FEATURES = new Set(['caption-generator', 'hashtag-extractor', 'content-rewriter', 'image-prompt-generator']);
 
 const INPUT_COST_PER_M = 0.15;
 const OUTPUT_COST_PER_M = 0.60;
@@ -266,6 +267,33 @@ router.post('/hashtag-extractor', async (req, res) => {
   try {
     const prisma = req.app.get('prisma');
     const result = await extractHashtags(prisma, { text, platform, maxTags, forceRefresh });
+    res.json(result);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// ─── Image Prompt Generator ─────────────────────────────────────────────────
+
+router.post('/image-prompt-generator', async (req, res) => {
+  const { platform, format, subject, goal, style, brandNotes, mustInclude, mustAvoid, forceRefresh } = req.body;
+  if (!subject || subject.trim().length < 5) {
+    return res.status(400).json({ error: 'subject is required (min 5 characters)', code: 'VALIDATION_ERROR' });
+  }
+
+  try {
+    const prisma = req.app.get('prisma');
+    const result = await generateImagePrompt(prisma, {
+      platform,
+      format,
+      subject,
+      goal,
+      style,
+      brandNotes,
+      mustInclude,
+      mustAvoid,
+      forceRefresh,
+    });
     res.json(result);
   } catch (err) {
     handleError(res, err);
