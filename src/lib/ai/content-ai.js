@@ -232,3 +232,106 @@ export async function rewriteContent(prisma, { text, targetTone, platform = 'gen
     model: MODEL,
   };
 }
+
+/**
+ * Generate a compact, brand-safe image generation prompt.
+ * Returns structured JSON for downstream image tools.
+ */
+export async function generateImagePrompt(prisma, {
+  platform = 'Instagram',
+  format = 'Square post',
+  subject,
+  goal = '',
+  style = 'Neon Cactus branded',
+  brandNotes = '',
+  mustInclude = '',
+  mustAvoid = '',
+  forceRefresh = false,
+}) {
+  const { systemMessage, userMessage, version } = renderTemplate('image-prompt-generator', {
+    platform,
+    format,
+    subject,
+    goal,
+    style,
+    brandNotes,
+    mustInclude,
+    mustAvoid,
+  });
+
+  const inputHash = hashInput({ platform, format, subject, goal, style, brandNotes, mustInclude, mustAvoid });
+  const cacheKey = computeCacheKey({
+    feature: 'image-prompt-generator',
+    inputHash,
+    promptVersion: version,
+    model: MODEL,
+  });
+
+  if (!forceRefresh) {
+    const cached = await getCachedResponse(prisma, cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached.responseBody);
+        return {
+          ...parsed,
+          cached: true,
+          usage: { promptTokens: cached.promptTokens, completionTokens: cached.completionTokens, totalTokens: cached.totalTokens },
+          model: MODEL,
+        };
+      } catch (_) {
+        // Cached response is invalid JSON — regenerate
+      }
+    }
+  }
+
+  const result = await chatCompletion({
+    model: MODEL,
+    messages: [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userMessage },
+    ],
+    responseFormat: 'json_object',
+    temperature: 0.4,
+    maxTokens: 512,
+  });
+
+  let parsed;
+  try {
+    parsed = JSON.parse(result.content);
+  } catch (_) {
+    throw Object.assign(new Error('AI returned invalid JSON'), { code: 'AI_INVALID_RESPONSE' });
+  }
+
+  const output = {
+    prompt: typeof parsed.prompt === 'string' ? parsed.prompt.trim() : '',
+    negativePrompt: typeof parsed.negativePrompt === 'string' ? parsed.negativePrompt.trim() : '',
+    size: typeof parsed.size === 'string' ? parsed.size.trim() : '',
+    usageNotes: Array.isArray(parsed.usageNotes) ? parsed.usageNotes.slice(0, 4) : [],
+  };
+
+  if (!output.prompt) {
+    throw Object.assign(new Error('AI returned empty image prompt'), { code: 'AI_INVALID_RESPONSE' });
+  }
+
+  await setCachedResponse(prisma, {
+    cacheKey,
+    feature: 'image-prompt-generator',
+    model: MODEL,
+    promptVersion: version,
+    inputHash,
+    responseFormat: 'json',
+    responseBody: JSON.stringify(output),
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    totalTokens: result.usage.totalTokens,
+    latencyMs: result.latencyMs,
+    expiresAt: ttlDate(),
+  });
+
+  return {
+    ...output,
+    cached: false,
+    usage: result.usage,
+    model: MODEL,
+  };
+}
