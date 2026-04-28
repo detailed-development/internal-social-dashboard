@@ -105,6 +105,7 @@ export const generateCaption = (params) => api.post('/ai/caption-generator', par
 export const extractHashtags = (params) => api.post('/ai/hashtag-extractor', params).then(r => r.data)
 export const generateReportDraft = (params) => api.post('/ai/report-draft', params).then(r => r.data)  // params may include selectedModules: string[]
 export const rewriteContent = (params) => api.post('/ai/content-rewriter', params).then(r => r.data)
+export const generateImagePrompt = (params) => api.post('/ai/image-prompt-generator', params).then(r => r.data)
 export const checkAiGeneration = (params) => api.post('/ai/check', params).then(r => r.data)
 export const getCachedIntervals = (params) => api.get('/ai/cached-intervals', { params }).then(r => r.data)
 export const deleteCachedInterval = (data) => api.delete('/ai/cached-intervals', { data }).then(r => r.data)
